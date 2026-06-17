@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF → Landing Page | Generador IA</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Ntizar-Aurora@master/ntizar.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Ntizar-Aurora@master/ntizar.next.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Ntizar-Aurora@master/ntizar.motion.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Ntizar-Aurora@master/ntizar.ui.css">
+  <style>
+    /* Custom minimal — solo lo específico de esta app */
+    :root {
+      --app-primary: var(--nz-brand);
+      --app-accent: var(--nz-accent);
+    }
+    .app-hero {
+      text-align: center;
+      padding: var(--nz-space-5) var(--nz-space-2);
+    }
+    .app-hero h1 {
+      font-size: var(--nz-size-5xl);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: var(--nz-space-2);
+    }
+    .app-hero p {
+      font-size: var(--nz-size-lg);
+      color: var(--nz-text-secondary);
+      max-width: 600px;
+      margin: 0 auto var(--nz-space-4);
+    }
+    .drop-zone {
+      border: 2px dashed var(--nz-border-medium);
+      border-radius: var(--nz-radius-xl);
+      padding: var(--nz-space-6) var(--nz-space-3);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: var(--nz-surface);
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--app-primary);
+      background: var(--nz-surface-hover);
+      transform: translateY(-2px);
+    }
+    .drop-zone.dragover {
+      box-shadow: 0 0 0 4px color-mix(in oklch, var(--app-primary) 20%, transparent);
+    }
+    .drop-zone-icon {
+      font-size: 4rem;
+      margin-bottom: var(--nz-space-2);
+      display: block;
+    }
+    .drop-zone-text {
+      font-size: var(--nz-size-xl);
+      font-weight: 600;
+      color: var(--nz-text-primary);
+      margin-bottom: var(--nz-space-1);
+    }
+    .drop-zone-sub {
+      font-size: var(--nz-size-sm);
+      color: var(--nz-text-secondary);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    /* Steps */
+    .steps-container {
+      max-width: 600px;
+      margin: var(--nz-space-4) auto;
+    }
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--nz-space-3);
+      padding: var(--nz-space-3);
+      border-radius: var(--nz-radius-lg);
+      margin-bottom: var(--nz-space-2);
+      opacity: 0.3;
+      transition: all 0.5s ease;
+      background: var(--nz-surface);
+    }
+    .step-item.active {
+      opacity: 1;
+      background: var(--nz-surface-hover);
+      box-shadow: 0 0 0 1px var(--app-primary);
+    }
+    .step-item.done {
+      opacity: 0.7;
+    }
+    .step-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+      background: var(--nz-surface-alt);
+      transition: all 0.3s ease;
+    }
+    .step-item.active .step-icon {
+      background: var(--app-primary);
+      color: white;
+      animation: stepPulse 1.5s infinite;
+    }
+    .step-item.done .step-icon {
+      background: var(--nz-success);
+      color: white;
+    }
+    @keyframes stepPulse {
+      0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--app-primary) 40%, transparent); }
+      50% { box-shadow: 0 0 0 8px color-mix(in oklch, var(--app-primary) 0%, transparent); }
+    }
+    .step-content h3 {
+      font-size: var(--nz-size-base);
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .step-content p {
+      font-size: var(--nz-size-sm);
+      color: var(--nz-text-secondary);
+      margin: 0;
+    }
+    /* Preview */
+    .preview-container {
+      display: none;
+      margin-top: var(--nz-space-4);
+    }
+    .preview-container.visible {
+      display: block;
+    }
+    .preview-frame {
+      width: 100%;
+      height: 600px;
+      border: none;
+      border-radius: var(--nz-radius-xl);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      background: white;
+    }
+    .preview-actions {
+      display: flex;
+      gap: var(--nz-space-2);
+      margin-top: var(--nz-space-3);
+      flex-wrap: wrap;
+    }
+    /* Design info */
+    .design-info {
+      display: none;
+      margin-top: var(--nz-space-3);
+    }
+    .design-info.visible {
+      display: block;
+    }
+    .design-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--nz-space-2);
+    }
+    .design-card {
+      background: var(--nz-surface);
+      border-radius: var(--nz-radius-lg);
+      padding: var(--nz-space-2);
+    }
+    .design-card-label {
+      font-size: var(--nz-size-xs);
+      color: var(--nz-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--nz-space-1);
+    }
+    .design-card-value {
+      font-size: var(--nz-size-sm);
+      font-weight: 600;
+    }
+    .color-swatches {
+      display: flex;
+      gap: 4px;
+    }
+    .color-swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--nz-border-medium);
+    }
+    /* Status bar */
+    .status-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--nz-surface);
+      border-top: 1px solid var(--nz-border-medium);
+      padding: var(--nz-space-2) var(--nz-space-3);
+      display: none;
+      align-items: center;
+      gap: var(--nz-space-2);
+      z-index: 100;
+    }
+    .status-bar.visible {
+      display: flex;
+    }
+    .status-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--nz-border-medium);
+      border-top-color: var(--app-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    /* File info */
+    .file-info {
+      display: none;
+      align-items: center;
+      gap: var(--nz-space-2);
+      padding: var(--nz-space-2) var(--nz-space-3);
+      background: var(--nz-surface);
+      border-radius: var(--nz-radius-lg);
+      margin-top: var(--nz-space-3);
+    }
+    .file-info.visible {
+      display: flex;
+    }
+    .file-name {
+      flex: 1;
+      font-size: var(--nz-size-sm);
+      font-weight: 500;
+    }
+    .file-size {
+      font-size: var(--nz-size-xs);
+      color: var(--nz-text-secondary);
+    }
+    /* Responsive */
+    @media (max-width: 768px) {
+      .app-hero h1 { font-size: var(--nz-size-3xl); }
+      .app-hero p { font-size: var(--nz-size-base); }
+      .preview-frame { height: 400px; }
+      .design-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .app-hero h1 { font-size: var(--nz-size-2xl); }
+      .preview-frame { height: 300px; }
+      .design-grid { grid-template-columns: 1fr; }
+    }
+    /* Loading overlay */
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .loading-overlay.visible {
+      display: flex;
+    }
+    .loading-card {
+      background: var(--nz-surface);
+      border-radius: var(--nz-radius-2xl);
+      padding: var(--nz-space-5);
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .loading-spinner-lg {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--nz-border-medium);
+      border-top-color: var(--app-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto var(--nz-space-3);
+    }
+  </style>
+</head>
+<body class="nz" data-nz-theme="light" data-nz-skin="aurora">
+
+  <!-- Mesh animado de fondo -->
+  <div class="nz-aurora-mesh nz-aurora-mesh--animated" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></div>
+  <div class="nz-orb nz-orb--aurora nz-orb--sm" style="position:fixed;top:10%;left:5%;z-index:0;"></div>
+  <div class="nz-orb nz-orb--accent" style="position:fixed;bottom:15%;right:8%;z-index:0;"></div>
+
+  <div style="position:relative;z-index:1;max-width:800px;margin:0 auto;padding:var(--nz-space-3);padding-bottom:100px;">
+    
+    <!-- Hero -->
+    <div class="app-hero nz-anim-fade-in">
+      <h1 class="nz-gradient-text">📄 → 🌐</h1>
+      <h1>PDF a Landing Page</h1>
+      <p>Sube un PDF con tu propuesta de diseño y la IA genera una landing page completa lista para desplegar.</p>
+    </div>
+
+    <!-- Drop Zone -->
+    <div class="nz-anim-fade-in nz-anim--delay-2">
+      <div class="drop-zone" id="dropZone">
+        <span class="drop-zone-icon">📁</span>
+        <div class="drop-zone-text">Arrastra tu PDF aquí</div>
+        <div class="drop-zone-sub">o haz clic para seleccionar · Máx 20MB</div>
+        <input type="file" id="fileInput" accept=".pdf">
+      </div>
+    </div>
+
+    <!-- File Info -->
+    <div class="file-info" id="fileInfo">
+      <span style="font-size:1.5rem;">📄</span>
+      <div>
+        <div class="file-name" id="fileName"></div>
+        <div class="file-size" id="fileSize"></div>
+      </div>
+      <button class="nz-btn nz-btn--ghost nz-btn--sm" id="removeFile">✕</button>
+    </div>
+
+    <!-- Steps -->
+    <div class="steps-container" id="stepsContainer" style="display:none;">
+      <div class="step-item" id="step1">
+        <div class="step-icon">📄</div>
+        <div class="step-content">
+          <h3>Extrayendo texto del PDF</h3>
+          <p>Analizando el contenido y estructura del documento</p>
+        </div>
+      </div>
+      <div class="step-item" id="step2">
+        <div class="step-icon">🎨</div>
+        <div class="step-content">
+          <h3>Analizando diseño y marca</h3>
+          <p>Extrayendo colores, tipografías, tono y estructura visual</p>
+        </div>
+      </div>
+      <div class="step-item" id="step3">
+        <div class="step-icon">✏️</div>
+        <div class="step-content">
+          <h3>Generando landing page</h3>
+          <p>Creando HTML responsive con el estilo identificado</p>
+        </div>
+      </div>
+      <div class="step-item" id="step4">
+        <div class="step-icon">🚀</div>
+        <div class="step-content">
+          <h3>Desplegando</h3>
+          <p>Publicando en GitHub Pages para que lo puedas ver online</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design Info -->
+    <div class="design-info" id="designInfo">
+      <h2 style="font-size:var(--nz-size-xl);font-weight:700;margin-bottom:var(--nz-space-2);">🎯 Diseño detectado</h2>
+      <div class="design-grid" id="designGrid"></div>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview-container" id="previewContainer">
+      <h2 style="font-size:var(--nz-size-xl);font-weight:700;margin:var(--nz-space-3) 0 var(--nz-space-2);">👁️ Vista previa</h2>
+      <iframe class="preview-frame" id="previewFrame"></iframe>
+      <div class="preview-actions">
+        <button class="nz-btn nz-btn--glass-liquid-brand" id="downloadBtn">⬇️ Descargar HTML</button>
+        <button class="nz-btn nz-btn--glass" id="openInNewTab">🔗 Abrir en nueva pestaña</button>
+        <button class="nz-btn nz-btn--ghost" id="resetBtn">🔄 Nuevo PDF</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ─── Estado ────────────────────────────────────────────────────
+    let selectedFile = null;
+    let generatedHTML = '';
+    let designData = null;
+
+    // ─── Elementos DOM ─────────────────────────────────────────────
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const removeFile = document.getElementById('removeFile');
+    const stepsContainer = document.getElementById('stepsContainer');
+    const previewContainer = document.getElementById('previewContainer');
+    const designInfo = document.getElementById('designInfo');
+    const designGrid = document.getElementById('designGrid');
+    const previewFrame = document.getElementById('previewFrame');
+
+    // ─── Drag & Drop ───────────────────────────────────────────────
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+      dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
+    });
+
+    dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      dropZone.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0 && files[0].type === 'application/pdf') {
+        handleFile(files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) handleFile(fileInput.files[0]);
+    });
+
+    removeFile.addEventListener('click', resetAll);
+
+    // ─── Manejo de archivo ─────────────────────────────────────────
+    function handleFile(file) {
+      selectedFile = file;
+      fileName.textContent = file.name;
+      fileSize.textContent = formatFileSize(file.size);
+      fileInfo.classList.add('visible');
+      dropZone.style.display = 'none';
+      processPDF();
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    // ─── Procesar PDF ──────────────────────────────────────────────
+    async function processPDF() {
+      stepsContainer.style.display = 'block';
+      previewContainer.classList.remove('visible');
+      designInfo.classList.remove('visible');
+
+      const formData = new FormData();
+      formData.append('pdf', selectedFile);
+
+      try {
+        // Paso 1: Extracción
+        setStepActive(1);
+        let res = await fetch('/api/process', { method: 'POST', body: formData });
+        let data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        // Paso 2: Análisis
+        setStepActive(2);
+        res = await fetch('/api/process', { method: 'POST', body: formData });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        // Paso 3: Generación
+        setStepActive(3);
+        res = await fetch('/api/process', { method: 'POST', body: formData });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        // Paso 4: Deploy
+        setStepActive(4);
+        res = await fetch('/api/process', { method: 'POST', body: formData });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        // ¡Todo listo!
+        setStepDone(4);
+        showResults(data);
+
+      } catch (err) {
+        console.error('Error:', err);
+        alert('Error procesando el PDF: ' + err.message);
+        resetAll();
+      }
+    }
+
+    function setStepActive(step) {
+      for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById('step' + i);
+        el.classList.remove('active', 'done');
+        if (i < step) el.classList.add('done');
+        if (i === step) el.classList.add('active');
+      }
+    }
+
+    function setStepDone(step) {
+      const el = document.getElementById('step' + step);
+      el.classList.remove('active');
+      el.classList.add('done');
+    }
+
+    // ─── Mostrar resultados ────────────────────────────────────────
+    function showResults(data) {
+      generatedHTML = data.html || '';
+      designData = data.design || {};
+
+      // Mostrar info del diseño
+      if (Object.keys(designData).length > 0) {
+        renderDesignInfo(designData);
+        designInfo.classList.add('visible');
+      }
+
+      // Mostrar preview
+      if (generatedHTML) {
+        const blob = new Blob([generatedHTML], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        previewFrame.src = url;
+        previewContainer.classList.add('visible');
+      }
+    }
+
+    function renderDesignInfo(design) {
+      const fields = [
+        { label: 'Empresa', value: design.empresa, icon: '🏢' },
+        { label: 'Sector', value: design.sector, icon: '📊' },
+        { label: 'Tono', value: design.tono, icon: '💬' },
+        { label: 'Estilo', value: design.estilo, icon: '✨' },
+        { label: 'Inspiración', value: design.inspiracion, icon: '💡' },
+        { label: 'CTA Principal', value: design.call_to_action, icon: '🎯' },
+      ];
+
+      if (design.colores_dominantes && design.colores_dominantes.length > 0) {
+        fields.push({
+          label: 'Colores',
+          value: '',
+          icon: '🎨',
+          isColors: true,
+          colors: design.colores_dominantes
+        });
+      }
+
+      if (design.url) {
+        fields.push({ label: 'Web', value: design.url, icon: '🌐' });
+      }
+
+      designGrid.innerHTML = fields.map(f => `
+        <div class="design-card">
+          <div class="design-card-label">${f.icon} ${f.label}</div>
+          ${f.isColors 
+            ? `<div class="color-swatches">${f.colors.map(c => `<div class="color-swatch" style="background:${c}" title="${c}"></div>`).join('')}</div>`
+            : `<div class="design-card-value">${f.value || '—'}</div>`
+          }
+        </div>
+      `).join('');
+    }
+
+    // ─── Acciones ──────────────────────────────────────────────────
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      if (!generatedHTML) return;
+      const blob = new Blob([generatedHTML], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'landing-page.html';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('openInNewTab').addEventListener('click', () => {
+      if (!generatedHTML) return;
+      const blob = new Blob([generatedHTML], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+    function resetAll() {
+      selectedFile = null;
+      generatedHTML = '';
+      designData = null;
+      fileInput.value = '';
+      fileInfo.classList.remove('visible');
+      dropZone.style.display = '';
+      stepsContainer.style.display = 'none';
+      previewContainer.classList.remove('visible');
+      designInfo.classList.remove('visible');
+      for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById('step' + i);
+        el.classList.remove('active', 'done');
+      }
+    }
+  </script>
+</body>
+</html>
