@@ -324,7 +324,11 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
-// Health check
+// Health check (simple, sin /api/ para Docker healthcheck)
+app.get('/healthz', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
