@@ -5,834 +5,1017 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF → Landing Page | Generador IA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <style>
-    /* ─── Reset & Variables ─────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --primary: #2563eb;
-      --accent: #f97316;
       --bg: #f8fafc;
       --surface: rgba(255,255,255,0.72);
-      --surface-solid: #ffffff;
+      --surface-strong: rgba(255,255,255,0.88);
+      --border: rgba(255,255,255,0.6);
+      --shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+      --shadow-hover: 0 16px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+      --blur: blur(24px) saturate(180%);
       --text: #0f172a;
-      --text-secondary: #64748b;
-      --border: rgba(0,0,0,0.08);
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-      --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
-      --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --accent: #f97316;
       --radius: 16px;
-      --radius-sm: 10px;
-      --glass: rgba(255,255,255,0.65);
-      --glass-border: rgba(255,255,255,0.35);
-    }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: 'Inter', -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-display: 'Space Grotesk', sans-serif;
     }
 
-    /* ─── Canvas Background ─────────────────────────────────────── */
-    #particleCanvas {
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Three.js canvas */
+    #three-bg {
       position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       z-index: 0;
       pointer-events: none;
     }
 
-    /* ─── Main Container ────────────────────────────────────────── */
-    .container {
-      position: relative;
+    /* Background overlays */
+    body::before {
+      content: "";
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse 800px 600px at 15% 20%, rgba(37,99,235,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 600px 500px at 85% 80%, rgba(249,115,22,0.05) 0%, transparent 60%);
       z-index: 1;
-      max-width: 760px;
-      margin: 0 auto;
-      padding: 3rem 1.5rem 6rem;
+      pointer-events: none;
     }
 
-    /* ─── Hero ──────────────────────────────────────────────────── */
-    .hero {
-      text-align: center;
-      margin-bottom: 2.5rem;
-      animation: fadeUp 0.6s ease-out;
+    .app { position: relative; z-index: 2; }
+
+    /* Glass card */
+    .glass {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
     }
-    .hero-badge {
+    .glass::before {
+      content: "";
+      position: absolute; inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.08) 40%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* Header */
+    .header {
+      padding: 2rem 2rem 1rem;
+      text-align: center;
+    }
+    .header-badge {
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
-      background: var(--glass);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      border-radius: 999px;
       padding: 0.4rem 1rem;
+      border-radius: 999px;
+      background: rgba(37,99,235,0.08);
+      color: var(--primary);
       font-size: 0.8rem;
       font-weight: 600;
-      color: var(--primary);
-      margin-bottom: 1.2rem;
+      letter-spacing: 0.02em;
+      margin-bottom: 1rem;
     }
-    .hero-badge span { font-size: 1.1rem; }
-    .hero h1 {
-      font-family: 'Space Grotesk', sans-serif;
+    .header h1 {
+      font-family: var(--font-display);
       font-size: clamp(2rem, 5vw, 3.2rem);
       font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-      margin-bottom: 0.8rem;
+      color: var(--text);
+      line-height: 1.15;
+      margin-bottom: 0.5rem;
     }
-    .hero h1 .gradient {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .hero p {
-      font-size: 1.05rem;
+    .header h1 .accent { color: var(--primary); }
+    .header p {
       color: var(--text-secondary);
+      font-size: 1.05rem;
       max-width: 520px;
       margin: 0 auto;
-      line-height: 1.5;
     }
 
-    /* ─── Drop Zone ─────────────────────────────────────────────── */
-    .dropzone {
-      background: var(--glass);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 2px dashed rgba(37,99,235,0.25);
-      border-radius: var(--radius);
+    /* Main container */
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 4rem;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      position: relative;
       padding: 3rem 2rem;
       text-align: center;
       cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
-      position: relative;
-      animation: fadeUp 0.6s ease-out 0.1s both;
+      transition: all 0.3s ease;
+      margin-bottom: 1.5rem;
     }
-    .dropzone:hover, .dropzone.dragover {
+    .upload-zone:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-hover);
+    }
+    .upload-zone.dragging {
       border-color: var(--primary);
       background: rgba(37,99,235,0.04);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
     }
-    .dropzone.dragover {
-      box-shadow: 0 0 0 4px rgba(37,99,235,0.12), var(--shadow-md);
+    .upload-zone.has-file {
+      padding: 1.5rem 2rem;
     }
-    .dropzone-icon {
-      font-size: 3.5rem;
+    .upload-icon {
+      font-size: 3rem;
       margin-bottom: 1rem;
       display: block;
-      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.08));
     }
-    .dropzone-title {
-      font-size: 1.15rem;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 0.4rem;
-    }
-    .dropzone-sub {
-      font-size: 0.85rem;
+    .upload-text {
+      font-size: 1rem;
       color: var(--text-secondary);
+      margin-bottom: 0.3rem;
     }
-    .dropzone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
+    .upload-hint {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    .upload-zone input[type="file"] {
+      display: none;
     }
 
-    /* ─── File Info ─────────────────────────────────────────────── */
+    /* File info */
     .file-info {
       display: none;
       align-items: center;
-      gap: 0.8rem;
-      background: var(--glass);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-sm);
-      padding: 0.8rem 1rem;
-      margin-top: 1rem;
-      animation: fadeUp 0.3s ease-out;
+      gap: 1rem;
+      text-align: left;
     }
     .file-info.visible { display: flex; }
-    .file-info-icon { font-size: 1.8rem; }
-    .file-info-name { flex: 1; font-weight: 600; font-size: 0.9rem; }
-    .file-info-size { font-size: 0.75rem; color: var(--text-secondary); }
-    .file-info-remove {
-      background: none;
-      border: none;
-      font-size: 1.1rem;
+    .file-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      background: rgba(37,99,235,0.08);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+    .file-details { flex: 1; min-width: 0; }
+    .file-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-size {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .file-remove {
+      background: none; border: none;
+      color: var(--text-muted);
       cursor: pointer;
-      color: var(--text-secondary);
+      font-size: 1.2rem;
       padding: 0.3rem;
-      border-radius: 6px;
+      border-radius: 8px;
       transition: all 0.2s;
     }
-    .file-info-remove:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+    .file-remove:hover {
+      background: rgba(220,38,38,0.08);
+      color: #dc2626;
+    }
 
-    /* ─── Steps ─────────────────────────────────────────────────── */
-    .steps {
+    /* Colors preview */
+    .colors-section {
       display: none;
-      margin-top: 1.5rem;
-      animation: fadeUp 0.4s ease-out;
+      margin-bottom: 1.5rem;
     }
-    .steps.visible { display: block; }
-    .step {
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      padding: 1rem;
-      border-radius: var(--radius-sm);
-      margin-bottom: 0.5rem;
-      opacity: 0.35;
-      transition: all 0.4s ease;
-      background: var(--glass);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid transparent;
-    }
-    .step.active {
-      opacity: 1;
-      background: var(--surface-solid);
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
-    }
-    .step.done { opacity: 0.6; }
-    .step-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1rem;
-      flex-shrink: 0;
-      background: rgba(0,0,0,0.04);
-      transition: all 0.3s;
-    }
-    .step.active .step-icon {
-      background: var(--primary);
-      color: white;
-      animation: pulse 1.5s infinite;
-    }
-    .step.done .step-icon {
-      background: #10b981;
-      color: white;
-    }
-    .step-text h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 2px; }
-    .step-text p { font-size: 0.78rem; color: var(--text-secondary); margin: 0; }
-
-    /* ─── Design Preview (antes de generar) ─────────────────────── */
-    .design-preview {
-      display: none;
-      margin-top: 1.5rem;
-      animation: fadeUp 0.5s ease-out;
-    }
-    .design-preview.visible { display: block; }
-    .design-preview-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 1rem;
-    }
-    .design-preview-header h2 {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.3rem;
-      font-weight: 700;
-    }
-    .design-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 0.8rem;
-      margin-bottom: 1.2rem;
-    }
-    .design-card {
-      background: var(--glass);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-sm);
-      padding: 0.8rem;
-    }
-    .design-card-label {
-      font-size: 0.7rem;
-      color: var(--text-secondary);
+    .colors-section.visible { display: block; }
+    .colors-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      font-weight: 600;
-      margin-bottom: 0.3rem;
+      margin-bottom: 0.75rem;
     }
-    .design-card-value { font-size: 0.85rem; font-weight: 600; }
-    .color-swatches { display: flex; gap: 4px; flex-wrap: wrap; }
-    .color-swatch {
-      width: 26px;
-      height: 26px;
-      border-radius: 6px;
-      border: 1.5px solid rgba(0,0,0,0.08);
-      box-shadow: var(--shadow-sm);
-    }
-    .design-actions {
+    .colors-row {
       display: flex;
-      gap: 0.8rem;
+      gap: 0.5rem;
       flex-wrap: wrap;
     }
+    .color-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.8rem 0.4rem 0.5rem;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 0.78rem;
+      font-weight: 500;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      color: var(--text-secondary);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .color-dot {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.8);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      flex-shrink: 0;
+    }
 
-    /* ─── Result Preview ────────────────────────────────────────── */
-    .result {
+    /* PDF preview */
+    .pdf-preview {
       display: none;
-      margin-top: 1.5rem;
-      animation: fadeUp 0.5s ease-out;
-    }
-    .result.visible { display: block; }
-    .result h2 {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.3rem;
-      font-weight: 700;
-      margin-bottom: 0.8rem;
-    }
-    .result-frame {
-      width: 100%;
-      height: 520px;
-      border: none;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-lg);
+      margin-bottom: 1.5rem;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
       background: white;
+      max-height: 240px;
     }
-    .result-actions {
-      display: flex;
-      gap: 0.8rem;
-      margin-top: 1rem;
-      flex-wrap: wrap;
+    .pdf-preview.visible { display: block; }
+    .pdf-preview canvas {
+      width: 100%;
+      height: auto;
+      display: block;
     }
 
-    /* ─── Buttons ───────────────────────────────────────────────── */
+    /* Analyze button */
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 0.5rem;
-      padding: 0.7rem 1.3rem;
-      border-radius: var(--radius-sm);
-      font-size: 0.88rem;
+      padding: 0.85rem 2rem;
+      border-radius: 12px;
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
       font-weight: 600;
       border: none;
       cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-      font-family: inherit;
+      transition: all 0.25s ease;
+      width: 100%;
     }
-    .btn:active { transform: scale(0.97); }
     .btn-primary {
-      background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
       color: white;
-      box-shadow: 0 2px 12px rgba(37,99,235,0.25);
+      box-shadow: 0 4px 14px rgba(37,99,235,0.3);
     }
-    .btn-primary:hover { box-shadow: 0 4px 20px rgba(37,99,235,0.35); transform: translateY(-1px); }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(37,99,235,0.4);
+    }
     .btn-primary:disabled {
       opacity: 0.5;
       cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
     }
-    .btn-glass {
-      background: var(--glass);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid var(--glass-border);
+    .btn-accent {
+      background: linear-gradient(135deg, var(--accent), #ea580c);
+      color: white;
+      box-shadow: 0 4px 14px rgba(249,115,22,0.3);
+    }
+    .btn-accent:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(249,115,22,0.4);
+    }
+    .btn-ghost {
+      background: var(--surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .btn-ghost:hover { background: var(--surface-strong); }
+
+    /* Progress */
+    .progress-section {
+      display: none;
+      margin: 1.5rem 0;
+    }
+    .progress-section.visible { display: block; }
+    .progress-bar-bg {
+      height: 6px;
+      background: rgba(37,99,235,0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 0.75rem;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      border-radius: 999px;
+      transition: width 0.5s ease;
+      width: 0%;
+    }
+    .progress-text {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    /* Result section */
+    .result-section {
+      display: none;
+      margin-top: 1.5rem;
+    }
+    .result-section.visible { display: block; }
+    .result-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .result-actions .btn { flex: 1; }
+
+    /* Design info card */
+    .design-card {
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .design-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
       color: var(--text);
     }
-    .btn-glass:hover { background: rgba(255,255,255,0.85); }
-    .btn-ghost {
-      background: transparent;
-      color: var(--text-secondary);
+    .design-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
     }
-    .btn-ghost:hover { background: rgba(0,0,0,0.04); color: var(--text); }
-    .btn-accent {
-      background: linear-gradient(135deg, var(--accent) 0%, #ea580c 100%);
-      color: white;
-      box-shadow: 0 2px 12px rgba(249,115,22,0.25);
+    .design-item {
+      padding: 0.75rem;
+      border-radius: 10px;
+      background: rgba(37,99,235,0.03);
+      border: 1px solid rgba(37,99,235,0.06);
     }
-    .btn-accent:hover { box-shadow: 0 4px 20px rgba(249,115,22,0.35); transform: translateY(-1px); }
-
-    /* ─── Error Toast ───────────────────────────────────────────── */
-    .toast {
-      position: fixed;
-      bottom: 1.5rem;
-      left: 50%;
-      transform: translateX(-50%) translateY(120%);
-      background: #1e293b;
-      color: white;
-      padding: 0.8rem 1.5rem;
-      border-radius: var(--radius-sm);
-      font-size: 0.88rem;
+    .design-item-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+    .design-item-value {
+      font-size: 0.9rem;
       font-weight: 500;
-      z-index: 1000;
-      transition: transform 0.4s cubic-bezier(0.4,0,0.2,1);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      color: var(--text);
     }
-    .toast.visible { transform: translateX(-50%) translateY(0); }
-    .toast.error { background: #dc2626; }
 
-    /* ─── Footer ────────────────────────────────────────────────── */
+    /* Footer */
     .footer {
       text-align: center;
-      margin-top: 4rem;
-      padding-top: 2rem;
-      border-top: 1px solid var(--border);
+      padding: 2rem;
       font-size: 0.8rem;
-      color: var(--text-secondary);
+      color: var(--text-muted);
     }
-    .footer a { color: var(--primary); text-decoration: none; font-weight: 600; }
-    .footer a:hover { text-decoration: underline; }
-
-    /* ─── Animations ────────────────────────────────────────────── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0.3); }
-      50% { box-shadow: 0 0 0 8px rgba(37,99,235,0); }
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .footer a {
+      color: var(--primary);
+      text-decoration: none;
     }
 
-    /* ─── Responsive ────────────────────────────────────────────── */
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2.5px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
+    /* Responsive */
     @media (max-width: 640px) {
-      .container { padding: 2rem 1rem 4rem; }
-      .hero h1 { font-size: 1.8rem; }
-      .hero p { font-size: 0.95rem; }
-      .dropzone { padding: 2rem 1.5rem; }
-      .result-frame { height: 350px; }
-      .design-grid { grid-template-columns: 1fr 1fr; }
+      .header { padding: 1.5rem 1rem 0.5rem; }
+      .container { padding: 1rem 1rem 3rem; }
+      .design-grid { grid-template-columns: 1fr; }
+      .result-actions { flex-direction: column; }
     }
   </style>
 </head>
 <body>
+  <canvas id="three-bg"></canvas>
 
-  <!-- Canvas de partículas de fondo -->
-  <canvas id="particleCanvas"></canvas>
+  <div class="app">
+    <header class="header">
+      <div class="header-badge">✨ Potenciado por IA</div>
+      <h1>PDF a <span class="accent">Landing Page</span></h1>
+      <p>Sube un PDF con tu propuesta de diseño y genera una landing page profesional con los colores e identidad visual reales</p>
+    </header>
 
-  <div class="container">
-
-    <!-- Hero -->
-    <div class="hero">
-      <div class="hero-badge">
-        <span>✨</span> Potenciado por IA
+    <div class="container">
+      <!-- Upload -->
+      <div class="upload-zone glass" id="uploadZone">
+        <div id="uploadPlaceholder">
+          <span class="upload-icon">📄</span>
+          <div class="upload-text">Arrastra tu PDF aquí o haz clic para seleccionar</div>
+          <div class="upload-hint">Máximo 20 MB</div>
+        </div>
+        <div class="file-info" id="fileInfo">
+          <div class="file-icon">📋</div>
+          <div class="file-details">
+            <div class="file-name" id="fileName"></div>
+            <div class="file-size" id="fileSize"></div>
+          </div>
+          <button class="file-remove" id="fileRemove" title="Eliminar">✕</button>
+        </div>
+        <input type="file" id="fileInput" accept=".pdf">
       </div>
-      <h1>PDF a <span class="gradient">Landing Page</span></h1>
-      <p>Sube un PDF con tu propuesta de diseño y la IA genera una landing page completa lista para descargar.</p>
-    </div>
 
-    <!-- Drop Zone -->
-    <div class="dropzone" id="dropZone">
-      <span class="dropzone-icon">📄</span>
-      <div class="dropzone-title">Arrastra tu PDF aquí</div>
-      <div class="dropzone-sub">o haz clic para seleccionar · Máx 20MB</div>
-      <input type="file" id="fileInput" accept=".pdf">
-    </div>
+      <!-- PDF Preview -->
+      <div class="pdf-preview" id="pdfPreview">
+        <canvas id="pdfCanvas"></canvas>
+      </div>
 
-    <!-- File Info -->
-    <div class="file-info" id="fileInfo">
-      <span class="file-info-icon">📄</span>
-      <div class="file-info-name" id="fileName"></div>
-      <div class="file-info-size" id="fileSize"></div>
-      <button class="file-info-remove" id="removeFile">✕</button>
-    </div>
+      <!-- Detected Colors -->
+      <div class="colors-section" id="colorsSection">
+        <div class="colors-label">🎨 Colores detectados en el PDF</div>
+        <div class="colors-row" id="colorsRow"></div>
+      </div>
 
-    <!-- Steps -->
-    <div class="steps" id="steps">
-      <div class="step" id="step1">
-        <div class="step-icon">📄</div>
-        <div class="step-text">
-          <h3>Extrayendo texto</h3>
-          <p>Analizando el contenido del documento</p>
+      <!-- Analyze button -->
+      <button class="btn btn-primary" id="analyzeBtn" disabled>
+        🔍 Analizar diseño con IA
+      </button>
+
+      <!-- Progress -->
+      <div class="progress-section" id="progressSection">
+        <div class="progress-bar-bg">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="progress-text" id="progressText">Preparando...</div>
+      </div>
+
+      <!-- Design result -->
+      <div class="result-section" id="resultSection">
+        <div class="design-card glass" id="designCard">
+          <h3>✅ Diseño detectado</h3>
+          <div class="design-grid" id="designGrid"></div>
+          <div class="colors-row" id="designColors" style="margin-top:1rem"></div>
+        </div>
+        <div class="result-actions">
+          <button class="btn btn-accent" id="generateBtn">
+            🚀 Generar Landing Page
+          </button>
+          <button class="btn btn-ghost" id="newAnalysisBtn">
+            📄 Otro PDF
+          </button>
         </div>
       </div>
-      <div class="step" id="step2">
-        <div class="step-icon">🎨</div>
-        <div class="step-text">
-          <h3>Analizando diseño</h3>
-          <p>Identificando colores, tipografía y estructura</p>
+
+      <!-- Generated HTML download -->
+      <div class="result-section" id="htmlResult">
+        <div class="design-card glass">
+          <h3>🎉 Landing page generada</h3>
+          <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem">
+            Tu landing page está lista. Descarga el archivo HTML y ábrelo en tu navegador.
+          </p>
+        </div>
+        <div class="result-actions">
+          <button class="btn btn-primary" id="downloadBtn">
+            ⬇️ Descargar HTML
+          </button>
+          <button class="btn btn-ghost" id="previewBtn">
+            👁️ Vista previa
+          </button>
         </div>
       </div>
-      <div class="step" id="step3">
-        <div class="step-icon">✏️</div>
-        <div class="step-text">
-          <h3>Generando landing</h3>
-          <p>Creando HTML responsive con el estilo detectado</p>
-        </div>
-      </div>
     </div>
 
-    <!-- Design Preview (mostrar ANTES de generar) -->
-    <div class="design-preview" id="designPreview">
-      <div class="design-preview-header">
-        <h2>🎯 Diseño detectado</h2>
-      </div>
-      <div class="design-grid" id="designGrid"></div>
-      <div class="design-actions">
-        <button class="btn btn-primary" id="generateBtn">✨ Generar Landing Page</button>
-        <button class="btn btn-ghost" id="editDesignBtn">✏️ Editar diseño</button>
-        <button class="btn btn-ghost" id="cancelBtn">Cancelar</button>
-      </div>
-    </div>
-
-    <!-- Result -->
-    <div class="result" id="result">
-      <h2>🚀 Tu landing page está lista</h2>
-      <iframe class="result-frame" id="resultFrame"></iframe>
-      <div class="result-actions">
-        <button class="btn btn-primary" id="downloadBtn">⬇️ Descargar HTML</button>
-        <button class="btn btn-glass" id="openBtn">🔗 Abrir en nueva pestaña</button>
-        <button class="btn btn-ghost" id="resetBtn">🔄 Otro PDF</button>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="footer">
+    <footer class="footer">
       Hecho con ❤️ por <a href="https://github.com/Ntizar" target="_blank">David Antizar</a>
-    </div>
+    </footer>
   </div>
 
-  <!-- Toast -->
-  <div class="toast" id="toast"></div>
+  <!-- Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- PDF.js -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 
   <script>
-    // ─── Particles Background ────────────────────────────────────
-    (() => {
-      const canvas = document.getElementById('particleCanvas');
-      const ctx = canvas.getContext('2d');
-      let w, h, particles = [], mouse = { x: -999, y: -999 };
+    // ═══════════════════════════════════════════════════════════
+    // THREE.JS BACKGROUND — Partículas + geometric shapes
+    // ═══════════════════════════════════════════════════════════
+    (function initThreeBackground() {
+      const canvas = document.getElementById('three-bg');
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-      function resize() {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 30;
+
+      // Particles
+      const particleCount = 600;
+      const positions = new Float32Array(particleCount * 3);
+      const colors = new Float32Array(particleCount * 3);
+      const sizes = new Float32Array(particleCount);
+
+      const palette = [
+        new THREE.Color(0x2563eb), // blue
+        new THREE.Color(0xf97316), // orange
+        new THREE.Color(0x94a3b8), // muted
+        new THREE.Color(0xe2e8f0), // light gray
+      ];
+
+      for (let i = 0; i < particleCount; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 80;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 60;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+        const c = palette[Math.floor(Math.random() * palette.length)];
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+        sizes[i] = Math.random() * 2 + 0.5;
       }
-      resize();
-      window.addEventListener('resize', resize);
 
-      // Mouse tracking
-      document.addEventListener('mousemove', e => {
-        mouse.x = e.clientX;
-        mouse.y = e.clientY;
+      const particleGeo = new THREE.BufferGeometry();
+      particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      particleGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+      const particleMat = new THREE.PointsMaterial({
+        size: 0.15,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const particles = new THREE.Points(particleGeo, particleMat);
+      scene.add(particles);
+
+      // Floating geometric shapes
+      const shapes = [];
+      const shapeMat = new THREE.MeshBasicMaterial({
+        color: 0x2563eb,
+        transparent: true,
+        opacity: 0.04,
+        wireframe: true,
+      });
+      const shapeMat2 = new THREE.MeshBasicMaterial({
+        color: 0xf97316,
+        transparent: true,
+        opacity: 0.03,
+        wireframe: true,
       });
 
-      // Particle class — documentos flotantes
-      class Particle {
-        constructor() {
-          this.reset();
-        }
-        reset() {
-          this.x = Math.random() * w;
-          this.y = Math.random() * h;
-          this.size = 8 + Math.random() * 18;
-          this.speedX = (Math.random() - 0.5) * 0.3;
-          this.speedY = -0.15 - Math.random() * 0.3;
-          this.rotation = Math.random() * Math.PI * 2;
-          this.rotSpeed = (Math.random() - 0.5) * 0.008;
-          this.opacity = 0.04 + Math.random() * 0.08;
-          this.type = Math.random() > 0.6 ? 'doc' : 'circle';
-        }
-        update() {
-          this.x += this.speedX;
-          this.y += this.speedY;
-          this.rotation += this.rotSpeed;
+      for (let i = 0; i < 8; i++) {
+        let geo;
+        const r = Math.random();
+        if (r < 0.33) geo = new THREE.IcosahedronGeometry(Math.random() * 3 + 1, 0);
+        else if (r < 0.66) geo = new THREE.OctahedronGeometry(Math.random() * 3 + 1, 0);
+        else geo = new THREE.TetrahedronGeometry(Math.random() * 3 + 1, 0);
 
-          // Mouse repulsion
-          const dx = this.x - mouse.x;
-          const dy = this.y - mouse.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 120) {
-            const force = (120 - dist) / 120 * 0.8;
-            this.x += (dx / dist) * force;
-            this.y += (dy / dist) * force;
-          }
-
-          // Wrap around
-          if (this.y < -30) { this.y = h + 30; this.x = Math.random() * w; }
-          if (this.x < -30) this.x = w + 30;
-          if (this.x > w + 30) this.x = -30;
-        }
-        draw() {
-          ctx.save();
-          ctx.translate(this.x, this.y);
-          ctx.rotate(this.rotation);
-          ctx.globalAlpha = this.opacity;
-
-          if (this.type === 'doc') {
-            // Mini documento
-            const s = this.size;
-            ctx.fillStyle = '#fff';
-            ctx.shadowColor = 'rgba(0,0,0,0.08)';
-            ctx.shadowBlur = 6;
-            ctx.beginPath();
-            ctx.roundRect(-s/2, -s*0.65, s, s*1.3, 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            // Líneas de texto
-            ctx.fillStyle = '#e2e8f0';
-            const lines = 3 + Math.floor(Math.random() * 3);
-            for (let i = 0; i < lines; i++) {
-              const lw = s * (0.4 + Math.random() * 0.35);
-              ctx.fillRect(-s/2 + s*0.12, -s*0.65 + s*0.2 + i * s*0.16, lw, s*0.06);
-            }
-            // Esquina doblada
-            ctx.fillStyle = '#f1f5f9';
-            ctx.beginPath();
-            ctx.moveTo(s/2 - s*0.18, -s*0.65);
-            ctx.lineTo(s/2, -s*0.65 + s*0.18);
-            ctx.lineTo(s/2 - s*0.18, -s*0.65 + s*0.18);
-            ctx.closePath();
-            ctx.fill();
-          } else {
-            // Círculo suave
-            ctx.fillStyle = Math.random() > 0.5 ? '#dbeafe' : '#ffedd5';
-            ctx.beginPath();
-            ctx.arc(0, 0, this.size * 0.3, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          ctx.restore();
-        }
+        const mesh = new THREE.Mesh(geo, Math.random() > 0.5 ? shapeMat : shapeMat2);
+        mesh.position.set(
+          (Math.random() - 0.5) * 50,
+          (Math.random() - 0.5) * 40,
+          (Math.random() - 0.5) * 20 - 10
+        );
+        mesh.userData = {
+          rotSpeed: { x: Math.random() * 0.003, y: Math.random() * 0.005, z: Math.random() * 0.002 },
+          floatSpeed: Math.random() * 0.3 + 0.1,
+          floatOffset: Math.random() * Math.PI * 2,
+        };
+        scene.add(mesh);
+        shapes.push(mesh);
       }
 
-      // Crear partículas
-      const count = Math.min(50, Math.floor(w * h / 25000));
-      for (let i = 0; i < count; i++) particles.push(new Particle());
-
-      // Gradient mesh de fondo
-      function drawBackground() {
-        const grad = ctx.createRadialGradient(w*0.2, h*0.3, 0, w*0.2, h*0.3, w*0.6);
-        grad.addColorStop(0, 'rgba(219,234,254,0.5)');
-        grad.addColorStop(1, 'rgba(248,250,252,0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, w, h);
-
-        const grad2 = ctx.createRadialGradient(w*0.8, h*0.7, 0, w*0.8, h*0.7, w*0.5);
-        grad2.addColorStop(0, 'rgba(255,237,213,0.4)');
-        grad2.addColorStop(1, 'rgba(248,250,252,0)');
-        ctx.fillStyle = grad2;
-        ctx.fillRect(0, 0, w, h);
-
-        const grad3 = ctx.createRadialGradient(w*0.5, h*0.1, 0, w*0.5, h*0.1, w*0.4);
-        grad3.addColorStop(0, 'rgba(243,232,255,0.3)');
-        grad3.addColorStop(1, 'rgba(248,250,252,0)');
-        ctx.fillStyle = grad3;
-        ctx.fillRect(0, 0, w, h);
-      }
+      // Animation
+      let mouseX = 0, mouseY = 0;
+      document.addEventListener('mousemove', (e) => {
+        mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+        mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+      });
 
       function animate() {
-        ctx.clearRect(0, 0, w, h);
-        drawBackground();
-        particles.forEach(p => { p.update(); p.draw(); });
         requestAnimationFrame(animate);
+
+        const t = Date.now() * 0.001;
+
+        // Particles drift
+        const pos = particleGeo.attributes.position.array;
+        for (let i = 0; i < particleCount; i++) {
+          pos[i * 3 + 1] += Math.sin(t * 0.3 + i * 0.01) * 0.003;
+          pos[i * 3] += Math.cos(t * 0.2 + i * 0.01) * 0.002;
+        }
+        particleGeo.attributes.position.needsUpdate = true;
+
+        // Shapes rotation + float
+        shapes.forEach(s => {
+          s.rotation.x += s.userData.rotSpeed.x;
+          s.rotation.y += s.userData.rotSpeed.y;
+          s.rotation.z += s.userData.rotSpeed.z;
+          s.position.y += Math.sin(t * s.userData.floatSpeed + s.userData.floatOffset) * 0.005;
+        });
+
+        // Camera follows mouse subtly
+        camera.position.x += (mouseX * 2 - camera.position.x) * 0.02;
+        camera.position.y += (-mouseY * 2 - camera.position.y) * 0.02;
+        camera.lookAt(scene.position);
+
+        renderer.render(scene, camera);
       }
       animate();
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
     })();
 
-    // ─── App State ───────────────────────────────────────────────
-    let selectedFile = null;
-    let designData = null;
-    let generatedHTML = '';
+    // ═══════════════════════════════════════════════════════════
+    // PDF.JS — Client-side rendering + color extraction
+    // ═══════════════════════════════════════════════════════════
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
-    // ─── DOM ─────────────────────────────────────────────────────
-    const $ = id => document.getElementById(id);
-    const dropZone = $('dropZone');
-    const fileInput = $('fileInput');
-    const fileInfo = $('fileInfo');
-    const steps = $('steps');
-    const designPreview = $('designPreview');
-    const result = $('result');
-    const toast = $('toast');
+    // Median Cut Algorithm for color quantization
+    function medianCut(pixels, numColors) {
+      if (pixels.length === 0) return [];
 
-    // ─── Drag & Drop ─────────────────────────────────────────────
-    ['dragenter','dragover','dragleave','drop'].forEach(e =>
-      dropZone.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); })
-    );
-    dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', e => {
-      dropZone.classList.remove('dragover');
-      const f = e.dataTransfer.files;
-      if (f.length && f[0].type === 'application/pdf') handleFile(f[0]);
-      else showToast('Solo se aceptan archivos PDF', true);
+      function getRange(bucket) {
+        let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
+        for (const p of bucket) {
+          if (p[0] < minR) minR = p[0]; if (p[0] > maxR) maxR = p[0];
+          if (p[1] < minG) minG = p[1]; if (p[1] > maxG) maxG = p[1];
+          if (p[2] < minB) minB = p[2]; if (p[2] > maxB) maxB = p[2];
+        }
+        return { r: maxR - minR, g: maxG - minG, b: maxB - minB };
+      }
+
+      function avgColor(bucket) {
+        let r = 0, g = 0, b = 0;
+        for (const p of bucket) { r += p[0]; g += p[1]; b += p[2]; }
+        const n = bucket.length;
+        return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+      }
+
+      let buckets = [pixels.slice()];
+
+      while (buckets.length < numColors) {
+        // Find largest bucket
+        let maxIdx = 0, maxLen = 0;
+        for (let i = 0; i < buckets.length; i++) {
+          if (buckets[i].length > maxLen) { maxLen = buckets[i].length; maxIdx = i; }
+        }
+        if (buckets[maxIdx].length < 2) break;
+
+        const bucket = buckets[maxIdx];
+        const range = getRange(bucket);
+
+        // Split along largest range
+        let channel = 0;
+        if (range.g >= range.r && range.g >= range.b) channel = 1;
+        else if (range.b >= range.r && range.b >= range.g) channel = 2;
+
+        bucket.sort((a, b) => a[channel] - b[channel]);
+        const mid = Math.floor(bucket.length / 2);
+
+        buckets.splice(maxIdx, 1, bucket.slice(0, mid), bucket.slice(mid));
+      }
+
+      return buckets.map(avgColor).filter(c => {
+        // Filter out near-white, near-black, and very desaturated colors
+        const brightness = (c[0] + c[1] + c[2]) / 3;
+        if (brightness > 240 || brightness < 15) return false;
+        const max = Math.max(c[0], c[1], c[2]);
+        const min = Math.min(c[0], c[1], c[2]);
+        const saturation = max === 0 ? 0 : (max - min) / max;
+        if (saturation < 0.08) return false; // too gray
+        return true;
+      });
+    }
+
+    function rgbToHex(r, g, b) {
+      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function extractColorsFromPDF(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      // Render first page
+      const page = await pdf.getPage(1);
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+      const canvas = document.getElementById('pdfCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // Show preview
+      document.getElementById('pdfPreview').classList.add('visible');
+
+      // Extract pixel data
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const pixels = [];
+      const data = imageData.data;
+
+      // Sample every 4th pixel for performance
+      for (let i = 0; i < data.length; i += 16) {
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+        if (a < 128) continue; // skip transparent
+        pixels.push([r, g, b]);
+      }
+
+      // Get dominant colors
+      const colors = medianCut(pixels, 8);
+
+      // Sort by saturation * brightness for visual impact
+      colors.sort((a, b) => {
+        const satA = (Math.max(...a) - Math.min(...a)) / Math.max(...a);
+        const satB = (Math.max(...b) - Math.min(...b)) / Math.max(...b);
+        return satB - satA;
+      });
+
+      return colors.slice(0, 6).map(c => ({
+        r: c[0], g: c[1], b: c[2],
+        hex: rgbToHex(c[0], c[1], c[2])
+      }));
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // UI LOGIC
+    // ═══════════════════════════════════════════════════════════
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const fileRemove = document.getElementById('fileRemove');
+    const colorsSection = document.getElementById('colorsSection');
+    const colorsRow = document.getElementById('colorsRow');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const progressSection = document.getElementById('progressSection');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const resultSection = document.getElementById('resultSection');
+    const designGrid = document.getElementById('designGrid');
+    const designColors = document.getElementById('designColors');
+    const generateBtn = document.getElementById('generateBtn');
+    const htmlResult = document.getElementById('htmlResult');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const previewBtn = document.getElementById('previewBtn');
+    const newAnalysisBtn = document.getElementById('newAnalysisBtn');
+
+    let currentFile = null;
+    let detectedColors = [];
+    let currentDesign = null;
+    let generatedHTML = null;
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function showColors(colors) {
+      colorsRow.innerHTML = '';
+      colors.forEach(c => {
+        const chip = document.createElement('div');
+        chip.className = 'color-chip';
+        chip.innerHTML = `<span class="color-dot" style="background:${c.hex}"></span>${c.hex}`;
+        colorsRow.appendChild(chip);
+      });
+      colorsSection.classList.add('visible');
+    }
+
+    function showDesignInfo(design) {
+      designGrid.innerHTML = '';
+      const fields = [
+        ['Empresa', design.empresa],
+        ['Sector', design.sector],
+        ['Tono', design.tono],
+        ['Inspiración', design.inspiracion],
+        ['Tipografía', design.tipografia?.heading],
+        ['Estilo', design.estilo],
+      ];
+      fields.forEach(([label, value]) => {
+        if (value) {
+          const div = document.createElement('div');
+          div.className = 'design-item';
+          div.innerHTML = `<div class="design-item-label">${label}</div><div class="design-item-value">${value}</div>`;
+          designGrid.appendChild(div);
+        }
+      });
+
+      // Show detected colors in design card
+      designColors.innerHTML = '';
+      if (design.paleta) {
+        const paleta = design.paleta;
+        ['primario', 'secundario', 'acento', 'fondo', 'texto'].forEach(key => {
+          if (paleta[key]) {
+            const chip = document.createElement('div');
+            chip.className = 'color-chip';
+            chip.innerHTML = `<span class="color-dot" style="background:${paleta[key]}"></span>${key}: ${paleta[key]}`;
+            designColors.appendChild(chip);
+          }
+        });
+      }
+
+      resultSection.classList.add('visible');
+    }
+
+    function setProgress(pct, text) {
+      progressBar.style.width = pct + '%';
+      progressText.textContent = text;
+    }
+
+    // Upload zone events
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type === 'application/pdf') handleFile(file);
     });
+
     fileInput.addEventListener('change', () => {
-      if (fileInput.files.length) handleFile(fileInput.files[0]);
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
     });
 
-    // ─── File Handling ───────────────────────────────────────────
-    function handleFile(file) {
-      if (file.size > 20 * 1024 * 1024) {
-        showToast('El archivo supera los 20MB', true);
-        return;
-      }
-      selectedFile = file;
-      $('fileName').textContent = file.name;
-      $('fileSize').textContent = formatSize(file.size);
+    fileRemove.addEventListener('click', (e) => {
+      e.stopPropagation();
+      resetAll();
+    });
+
+    function resetAll() {
+      currentFile = null;
+      detectedColors = [];
+      currentDesign = null;
+      generatedHTML = null;
+      fileInput.value = '';
+      uploadPlaceholder.style.display = '';
+      fileInfo.classList.remove('visible');
+      colorsSection.classList.remove('visible');
+      document.getElementById('pdfPreview').classList.remove('visible');
+      resultSection.classList.remove('visible');
+      htmlResult.classList.remove('visible');
+      progressSection.classList.remove('visible');
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '🔍 Analizar diseño con IA';
+    }
+
+    async function handleFile(file) {
+      currentFile = file;
+      uploadPlaceholder.style.display = 'none';
       fileInfo.classList.add('visible');
-      dropZone.style.display = 'none';
-      startExtraction();
-    }
+      fileName.textContent = file.name;
+      fileSize.textContent = formatSize(file.size);
 
-    function formatSize(b) {
-      if (b < 1024) return b + ' B';
-      if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
-      return (b/1048576).toFixed(1) + ' MB';
-    }
-
-    // ─── Steps ───────────────────────────────────────────────────
-    function setStep(n, state) {
-      for (let i = 1; i <= 3; i++) {
-        const el = $('step'+i);
-        el.classList.remove('active','done');
-        if (i < n) el.classList.add('done');
-        if (i === n && state === 'active') el.classList.add('active');
-        if (i === n && state === 'done') el.classList.add('done');
-      }
-    }
-
-    // ─── Extraction & Analysis ───────────────────────────────────
-    async function startExtraction() {
-      steps.classList.add('visible');
-      designPreview.classList.remove('visible');
-      result.classList.remove('visible');
-
-      const formData = new FormData();
-      formData.append('pdf', selectedFile);
+      // Extract colors from PDF
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '<span class="spinner"></span> Analizando PDF...';
 
       try {
-        // Paso 1+2: Extracción + Análisis (un solo endpoint)
-        setStep(1, 'active');
-        const res = await fetch('/api/analyze', { method: 'POST', body: formData });
-        setStep(1, 'done');
-        setStep(2, 'active');
+        detectedColors = await extractColorsFromPDF(file);
+        showColors(detectedColors);
+        analyzeBtn.disabled = false;
+        analyzeBtn.innerHTML = '🔍 Analizar diseño con IA';
+      } catch (err) {
+        console.error('Error extracting colors:', err);
+        analyzeBtn.disabled = false;
+        analyzeBtn.innerHTML = '🔍 Analizar diseño con IA';
+      }
+    }
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error desconocido');
+    // Analyze button
+    analyzeBtn.addEventListener('click', async () => {
+      if (!currentFile) return;
 
-        setStep(2, 'done');
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '<span class="spinner"></span> Analizando...';
+      progressSection.classList.add('visible');
+      resultSection.classList.remove('visible');
+      htmlResult.classList.remove('visible');
 
-        // Mostrar diseño detectado ANTES de generar
-        designData = data.design;
-        renderDesign(designData);
-        designPreview.classList.add('visible');
-        steps.classList.remove('visible');
+      try {
+        // Step 1: Upload and analyze PDF
+        setProgress(20, 'Subiendo PDF al servidor...');
+        const formData = new FormData();
+        formData.append('pdf', currentFile);
+
+        // Include detected colors
+        const colorData = detectedColors.map(c => c.hex);
+
+        // Send detected colors to backend
+        formData.append('detectedColors', JSON.stringify(detectedColors.map(c => c.hex)));
+
+        setProgress(40, 'IA analizando el diseño...');
+        const analyzeRes = await fetch('/api/analyze', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!analyzeRes.ok) {
+          const err = await analyzeRes.json();
+          throw new Error(err.error || 'Error analizando el PDF');
+        }
+
+        const analyzeData = await analyzeRes.json();
+        currentDesign = analyzeData.design;
+
+        // Merge detected colors into the design
+        if (colorData.length > 0) {
+          currentDesign._detectedColors = colorData;
+        }
+
+        setProgress(100, 'Análisis completado');
+        showDesignInfo(currentDesign);
 
       } catch (err) {
-        showToast(err.message, true);
-        resetAll();
+        alert('Error: ' + err.message);
+        progressSection.classList.remove('visible');
+        analyzeBtn.disabled = false;
+        analyzeBtn.innerHTML = '🔍 Analizar diseño con IA';
       }
-    }
-
-    function renderDesign(d) {
-      const fields = [
-        { label: 'Empresa', value: d.empresa, icon: '🏢' },
-        { label: 'Sector', value: d.sector, icon: '📊' },
-        { label: 'Tono', value: d.tono, icon: '💬' },
-        { label: 'Estilo', value: d.estilo, icon: '✨' },
-        { label: 'Inspiración', value: d.inspiracion, icon: '💡' },
-        { label: 'CTA', value: d.call_to_action, icon: '🎯' },
-      ];
-      if (d.colores_dominantes?.length) {
-        fields.push({ label: 'Colores', icon: '🎨', isColors: true, colors: d.colores_dominantes });
-      }
-
-      $('designGrid').innerHTML = fields.map(f => `
-        <div class="design-card">
-          <div class="design-card-label">${f.icon} ${f.label}</div>
-          ${f.isColors
-            ? `<div class="color-swatches">${f.colors.map(c => `<div class="color-swatch" style="background:${c}" title="${c}"></div>`).join('')}</div>`
-            : `<div class="design-card-value">${f.value || '—'}</div>`
-          }
-        </div>
-      `).join('');
-    }
-
-    // ─── Generate Landing ────────────────────────────────────────
-    $('generateBtn').addEventListener('click', generateLanding);
-    $('editDesignBtn').addEventListener('click', () => {
-      showToast('Edición manual próximamente');
     });
-    $('cancelBtn').addEventListener('click', resetAll);
 
-    async function generateLanding() {
-      designPreview.classList.remove('visible');
-      steps.classList.add('visible');
-      setStep(3, 'active');
-      $('generateBtn').disabled = true;
+    // Generate button
+    generateBtn.addEventListener('click', async () => {
+      if (!currentDesign) return;
+
+      generateBtn.disabled = true;
+      generateBtn.innerHTML = '<span class="spinner"></span> Generando landing...';
+      progressSection.classList.add('visible');
+      htmlResult.classList.remove('visible');
 
       try {
+        setProgress(30, 'Generando HTML con IA...');
+
         const res = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ design: designData })
+          body: JSON.stringify({ design: currentDesign }),
         });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error generando landing');
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Error generando la landing');
+        }
 
-        setStep(3, 'done');
+        const data = await res.json();
         generatedHTML = data.html;
 
-        // Mostrar resultado
-        const blob = new Blob([generatedHTML], { type: 'text/html' });
-        $('resultFrame').src = URL.createObjectURL(blob);
-        steps.classList.remove('visible');
-        result.classList.add('visible');
+        setProgress(100, 'Landing page generada');
+        htmlResult.classList.add('visible');
 
       } catch (err) {
-        showToast(err.message, true);
-        steps.classList.remove('visible');
-        designPreview.classList.add('visible');
+        alert('Error: ' + err.message);
+        progressSection.classList.remove('visible');
       } finally {
-        $('generateBtn').disabled = false;
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = '🚀 Generar Landing Page';
       }
-    }
+    });
 
-    // ─── Result Actions ──────────────────────────────────────────
-    $('downloadBtn').addEventListener('click', () => {
+    // Download
+    downloadBtn.addEventListener('click', () => {
       if (!generatedHTML) return;
       const blob = new Blob([generatedHTML], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = (designData?.empresa || 'landing') + '.html';
+      a.href = url;
+      a.download = 'landing-page.html';
       a.click();
-      URL.revokeObjectURL(a.href);
+      URL.revokeObjectURL(url);
     });
 
-    $('openBtn').addEventListener('click', () => {
+    // Preview
+    previewBtn.addEventListener('click', () => {
       if (!generatedHTML) return;
       const blob = new Blob([generatedHTML], { type: 'text/html' });
-      window.open(URL.createObjectURL(blob), '_blank');
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
     });
 
-    $('resetBtn').addEventListener('click', resetAll);
-    $('removeFile').addEventListener('click', resetAll);
-
-    function resetAll() {
-      selectedFile = null;
-      designData = null;
-      generatedHTML = '';
-      fileInput.value = '';
-      fileInfo.classList.remove('visible');
-      dropZone.style.display = '';
-      steps.classList.remove('visible');
-      designPreview.classList.remove('visible');
-      result.classList.remove('visible');
-      for (let i = 1; i <= 3; i++) $('step'+i).classList.remove('active','done');
-    }
-
-    // ─── Toast ───────────────────────────────────────────────────
-    function showToast(msg, isError = false) {
-      toast.textContent = msg;
-      toast.className = 'toast visible' + (isError ? ' error' : '');
-      setTimeout(() => toast.classList.remove('visible'), 4000);
-    }
+    // New analysis
+    newAnalysisBtn.addEventListener('click', resetAll);
   </script>
 </body>
 </html>
