@@ -8,7 +8,7 @@ import { createRequire } from 'module';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const { PDFParse } = require('pdf-parse');
+const pdfParse = require('pdf-parse');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,10 +40,8 @@ function getNanToken() {
 
 // ─── Extraccion de texto ────────────────────────────────────────
 async function extractPdfText(fileBuffer) {
-  const parser = new PDFParse({ data: fileBuffer });
-  const result = await parser.getText();
-  await parser.destroy();
-  return result.text || '';
+  const data = await pdfParse(fileBuffer);
+  return data.text;
 }
 
 // ─── Analisis de diseno con IA ──────────────────────────────────
