@@ -408,16 +408,25 @@
     }
     .result-actions .btn { flex: 1; }
 
-    /* Design info card */
+    /* Design info card — EDITABLE */
     .design-card {
       padding: 1.5rem;
       margin-bottom: 1rem;
+      position: relative;
     }
     .design-card h3 {
       font-family: var(--font-display);
       font-size: 1.1rem;
       margin-bottom: 1rem;
       color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .design-card h3 small {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--text-muted);
     }
     .design-grid {
       display: grid;
@@ -429,6 +438,10 @@
       border-radius: 10px;
       background: rgba(37,99,235,0.03);
       border: 1px solid rgba(37,99,235,0.06);
+      transition: border-color 0.2s;
+    }
+    .design-item:hover {
+      border-color: rgba(37,99,235,0.15);
     }
     .design-item-label {
       font-size: 0.72rem;
@@ -436,12 +449,93 @@
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.35rem;
     }
     .design-item-value {
       font-size: 0.9rem;
       font-weight: 500;
       color: var(--text);
+    }
+    .design-input {
+      width: 100%;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text);
+      outline: none;
+      padding: 0;
+    }
+    .design-input:focus {
+      color: var(--primary);
+    }
+    .design-textarea {
+      width: 100%;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text);
+      outline: none;
+      padding: 0;
+      resize: vertical;
+      min-height: 2.5em;
+    }
+    .design-textarea:focus {
+      color: var(--primary);
+    }
+    .design-select {
+      width: 100%;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text);
+      outline: none;
+      padding: 0;
+      cursor: pointer;
+    }
+    .design-colors-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(37,99,235,0.08);
+    }
+    .design-color-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.6rem;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(37,99,235,0.06);
+    }
+    .design-color-item input[type="color"] {
+      width: 22px; height: 22px;
+      border: 2px solid rgba(255,255,255,0.8);
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 0;
+      background: none;
+    }
+    .design-color-item input[type="text"] {
+      width: 72px;
+      border: none;
+      background: transparent;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      outline: none;
+    }
+    .design-color-label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-transform: capitalize;
     }
 
     /* Footer */
@@ -532,12 +626,12 @@
         <div class="progress-text" id="progressText">Preparando...</div>
       </div>
 
-      <!-- Design result -->
+      <!-- Design result — EDITABLE -->
       <div class="result-section" id="resultSection">
         <div class="design-card glass" id="designCard">
-          <h3>✅ Diseño detectado</h3>
+          <h3>✅ Diseño detectado <small>(edita antes de generar)</small></h3>
           <div class="design-grid" id="designGrid"></div>
-          <div class="colors-row" id="designColors" style="margin-top:1rem"></div>
+          <div class="design-colors-grid" id="designColors"></div>
         </div>
         <div class="result-actions">
           <button class="btn btn-accent" id="generateBtn">
@@ -769,43 +863,59 @@
     async function extractColorsFromPDF(file) {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const totalPages = Math.min(pdf.numPages, 5); // Max 5 pages
 
-      // Render first page
-      const page = await pdf.getPage(1);
-      const scale = 1.5;
-      const viewport = page.getViewport({ scale });
       const canvas = document.getElementById('pdfCanvas');
       const ctx = canvas.getContext('2d');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      await page.render({ canvasContext: ctx, viewport }).promise;
+      const allPixels = [];
+
+      // Render multiple pages for better color coverage
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const scale = 1;
+        const viewport = page.getViewport({ scale });
+
+        // Use offscreen canvas for pages > 1
+        if (pageNum === 1) {
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+        }
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = viewport.width;
+        tempCanvas.height = viewport.height;
+        const tempCtx = tempCanvas.getContext('2d');
+
+        await page.render({ canvasContext: tempCtx, viewport }).promise;
+
+        // Extract pixels
+        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 8) { // Sample every 2nd pixel
+          const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+          if (a < 128) continue;
+          allPixels.push([r, g, b]);
+        }
+
+        // Render first page to visible canvas for preview
+        if (pageNum === 1) {
+          await page.render({ canvasContext: ctx, viewport }).promise;
+        }
+      }
 
       // Show preview
       document.getElementById('pdfPreview').classList.add('visible');
 
-      // Extract pixel data
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const pixels = [];
-      const data = imageData.data;
+      // Get dominant colors from ALL pages combined
+      const rawColors = medianCut(allPixels, 15);
 
-      // Sample every 4th pixel for performance
-      for (let i = 0; i < data.length; i += 16) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-        if (a < 128) continue; // skip transparent
-        pixels.push([r, g, b]);
-      }
-
-      // Get dominant colors (15 buckets for maximum coverage)
-      const rawColors = medianCut(pixels, 15);
-
-      // Sort by visual impact: saturated colors first, then by brightness diversity
       rawColors.sort((a, b) => {
         const satA = (Math.max(...a) - Math.min(...a)) / Math.max(...a);
         const satB = (Math.max(...b) - Math.min(...b)) / Math.max(...b);
         return satB - satA;
       });
 
-      // Return ALL colors (no filtering — let user decide)
       return rawColors.map(c => ({
         r: c[0], g: c[1], b: c[2],
         hex: rgbToHex(c[0], c[1], c[2])
@@ -914,36 +1024,100 @@
 
     function showDesignInfo(design) {
       designGrid.innerHTML = '';
+
+      // Editable fields with appropriate input types
       const fields = [
-        ['Empresa', design.empresa],
-        ['Sector', design.sector],
-        ['Tono', design.tono],
-        ['Inspiración', design.inspiracion],
-        ['Tipografía', design.tipografia?.heading],
-        ['Estilo', design.estilo],
+        { key: 'empresa', label: 'Empresa', type: 'text' },
+        { key: 'sector', label: 'Sector', type: 'text' },
+        { key: 'tono', label: 'Tono', type: 'select', options: ['formal','informal','creativo','corporativo','minimalista','audaz'] },
+        { key: 'inspiracion', label: 'Inspiración', type: 'text' },
+        { key: 'tipografia_heading', label: 'Tipografía Heading', type: 'select', options: ['serif','sans-serif','display','monospace'] },
+        { key: 'estilo', label: 'Estilo', type: 'textarea' },
       ];
-      fields.forEach(([label, value]) => {
-        if (value) {
-          const div = document.createElement('div');
-          div.className = 'design-item';
-          div.innerHTML = `<div class="design-item-label">${label}</div><div class="design-item-value">${value}</div>`;
-          designGrid.appendChild(div);
+
+      fields.forEach(f => {
+        let value = '';
+        if (f.key === 'tipografia_heading') {
+          value = design.tipografia?.heading || 'sans-serif';
+        } else {
+          value = design[f.key] || '';
         }
+
+        const div = document.createElement('div');
+        div.className = 'design-item';
+
+        let inputHTML = '';
+        if (f.type === 'select') {
+          const options = f.options.map(o =>
+            `<option value="${o}" ${o === value ? 'selected' : ''}>${o}</option>`
+          ).join('');
+          inputHTML = `<select class="design-select" data-field="${f.key}">${options}</select>`;
+        } else if (f.type === 'textarea') {
+          inputHTML = `<textarea class="design-textarea" data-field="${f.key}">${value}</textarea>`;
+        } else {
+          inputHTML = `<input type="text" class="design-input" data-field="${f.key}" value="${value}">`;
+        }
+
+        div.innerHTML = `<div class="design-item-label">${f.label}</div>${inputHTML}`;
+        designGrid.appendChild(div);
       });
 
-      // Show detected colors in design card
+      // Editable palette colors
       designColors.innerHTML = '';
       if (design.paleta) {
         const paleta = design.paleta;
         ['primario', 'secundario', 'acento', 'fondo', 'texto'].forEach(key => {
-          if (paleta[key]) {
-            const chip = document.createElement('div');
-            chip.className = 'color-chip';
-            chip.innerHTML = `<span class="color-dot" style="background:${paleta[key]}"></span>${key}: ${paleta[key]}`;
-            designColors.appendChild(chip);
-          }
+          const hex = paleta[key] || '#000000';
+          const item = document.createElement('div');
+          item.className = 'design-color-item';
+          item.innerHTML = `
+            <input type="color" value="${hex}" data-palette="${key}">
+            <input type="text" value="${hex}" data-palette="${key}" maxlength="7">
+            <span class="design-color-label">${key}</span>
+          `;
+          designColors.appendChild(item);
+        });
+
+        // Bind color sync events
+        designColors.querySelectorAll('input[type="color"]').forEach(input => {
+          input.addEventListener('input', (e) => {
+            const key = e.target.dataset.palette;
+            const hex = e.target.value;
+            const textInput = designColors.querySelector(`input[type="text"][data-palette="${key}"]`);
+            if (textInput) textInput.value = hex;
+            // Update the design object
+            if (currentDesign && currentDesign.paleta) currentDesign.paleta[key] = hex;
+          });
+        });
+
+        designColors.querySelectorAll('input[type="text"]').forEach(input => {
+          input.addEventListener('change', (e) => {
+            const key = e.target.dataset.palette;
+            let hex = e.target.value.trim();
+            if (!hex.startsWith('#')) hex = '#' + hex;
+            if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+              const colorInput = designColors.querySelector(`input[type="color"][data-palette="${key}"]`);
+              if (colorInput) colorInput.value = hex;
+              if (currentDesign && currentDesign.paleta) currentDesign.paleta[key] = hex;
+            }
+          });
         });
       }
+
+      // Bind text field change events
+      designGrid.querySelectorAll('.design-input, .design-textarea, .design-select').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const field = e.target.dataset.field;
+          const value = e.target.value;
+          if (!currentDesign) return;
+          if (field === 'tipografia_heading') {
+            if (!currentDesign.tipografia) currentDesign.tipografia = {};
+            currentDesign.tipografia.heading = value;
+          } else {
+            currentDesign[field] = value;
+          }
+        });
+      });
 
       resultSection.classList.add('visible');
     }
