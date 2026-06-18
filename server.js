@@ -67,7 +67,7 @@ async function analyzeDesign(text, fileName, detectedColors) {
     '  "tipografia": { "heading": "serif | sans-serif | display | monospace", "body": "serif | sans-serif" },\n' +
     '  "estilo": "descripcion corta del estilo visual (max 30 palabras)",\n' +
     '  "secciones": [ {"tipo": "hero|about|services|portfolio|testimonials|contact|cta|pricing|faq|team|footer", "titulo": "titulo", "descripcion": "descripcion breve"} ],\n' +
-    '  "colores_dominantes": ["#hex1", "#hex2", "#hex3"],\n' +
+    '  "colores_dominantes": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],\n' +
     '  "elementos_visuales": ["iconos | ilustraciones | fotos | gradientes | formas geometricas"],\n' +
     '  "inspiracion": "referencia de estilo (Stripe | Apple | Linear | Notion | Figma | etc.)",\n' +
     '  "call_to_action": "texto del boton principal",\n' +
@@ -77,15 +77,17 @@ async function analyzeDesign(text, fileName, detectedColors) {
     '  "features": [ {"titulo": "feature", "descripcion": "breve descripcion"} ],\n' +
     '  "testimonios": [ {"texto": "cita", "autor": "nombre", "cargo": "rol"} ]\n' +
     '}\n' +
-    'REGLAS:\n' +
+    'REGLAS CRITICAS para colores:\n' +
     '1. Responde SOLO con JSON valido, sin markdown, sin backticks\n' +
     '2. Si no hay info para un campo, usa null o valores por defecto razonables\n' +
-    '3. Los colores DEBEN ser hex validos\n' +
+    '3. Los colores DEBEN ser hex validos (ej: #FF5733)\n' +
     '4. No inventes datos especificos si no aparecen en el PDF\n' +
-    '5. SI HAY COLORES DETECTADOS VISUALMENTE: usa esos como base para la paleta. ' +
-    'El color primario es el mas dominante, el secundario complementa, el acento es el color llamativo.\n' +
-    '6. El fondo debe ser blanco o muy claro para legibilidad\n' +
-    '7. El texto debe ser oscuro sobre fondo claro';
+    '5. SI HAY COLORES DETECTADOS VISUALMENTE: USA ESOS como base. El primario es el color mas dominante de la marca.\n' +
+    '6. "fondo":的颜色 debe ser el color de fondo REAL del PDF (blanco, crema, oscuro, etc.)\n' +
+    '7. "texto":的颜色 debe ser el color del texto PRINCIPAL (negro, gris oscuro, etc.)\n' +
+    '8. "colores_dominantes": incluye TODOS los colores importantes: marca, fondo, texto, acentos (minimo 5)\n' +
+    '9. Si el PDF tiene verde como color de marca, el primario DEBE ser verde\n' +
+    '10. El fondo y texto son TAN IMPORTANTES como el color de marca';
 
   const response = await fetch('https://api.nan.builders/v1/chat/completions', {
     method: 'POST',

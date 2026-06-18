@@ -198,7 +198,7 @@
       color: #dc2626;
     }
 
-    /* Colors preview */
+    /* Colors preview — EDITABLE */
     .colors-section {
       display: none;
       margin-bottom: 1.5rem;
@@ -211,6 +211,15 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .colors-label small {
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text-muted);
     }
     .colors-row {
       display: flex;
@@ -231,6 +240,15 @@
       color: var(--text-secondary);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
+      transition: all 0.2s;
+    }
+    .color-chip:hover {
+      border-color: var(--primary);
+      box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+    }
+    .color-chip.selected {
+      border-color: var(--primary);
+      background: rgba(37,99,235,0.08);
     }
     .color-dot {
       width: 18px; height: 18px;
@@ -238,6 +256,53 @@
       border: 2px solid rgba(255,255,255,0.8);
       box-shadow: 0 1px 3px rgba(0,0,0,0.15);
       flex-shrink: 0;
+      cursor: pointer;
+    }
+    .color-input {
+      width: 72px;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+    .color-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 0 0.2rem;
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .color-chip:hover .color-remove { opacity: 1; }
+    .color-remove:hover { color: #dc2626; }
+    .color-add {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 999px;
+      background: transparent;
+      border: 1.5px dashed var(--border);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .color-add:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    .colors-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      font-style: italic;
     }
 
     /* PDF preview */
@@ -445,10 +510,13 @@
         <canvas id="pdfCanvas"></canvas>
       </div>
 
-      <!-- Detected Colors -->
+      <!-- Detected Colors — EDITABLE -->
       <div class="colors-section" id="colorsSection">
-        <div class="colors-label">🎨 Colores detectados en el PDF</div>
+        <div class="colors-label">
+          🎨 Colores detectados <small>(clic para editar, ✕ para eliminar)</small>
+        </div>
         <div class="colors-row" id="colorsRow"></div>
+        <div class="colors-hint">Estos colores se extraen del PDF. Edítalos si la IA no detectó bien alguno.</div>
       </div>
 
       <!-- Analyze button -->
@@ -664,17 +732,9 @@
         return { r: maxR - minR, g: maxG - minG, b: maxB - minB };
       }
 
-      function avgColor(bucket) {
-        let r = 0, g = 0, b = 0;
-        for (const p of bucket) { r += p[0]; g += p[1]; b += p[2]; }
-        const n = bucket.length;
-        return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
-      }
-
       let buckets = [pixels.slice()];
 
       while (buckets.length < numColors) {
-        // Find largest bucket
         let maxIdx = 0, maxLen = 0;
         for (let i = 0; i < buckets.length; i++) {
           if (buckets[i].length > maxLen) { maxLen = buckets[i].length; maxIdx = i; }
@@ -684,7 +744,6 @@
         const bucket = buckets[maxIdx];
         const range = getRange(bucket);
 
-        // Split along largest range
         let channel = 0;
         if (range.g >= range.r && range.g >= range.b) channel = 1;
         else if (range.b >= range.r && range.b >= range.g) channel = 2;
@@ -695,15 +754,11 @@
         buckets.splice(maxIdx, 1, bucket.slice(0, mid), bucket.slice(mid));
       }
 
-      return buckets.map(avgColor).filter(c => {
-        // Filter out near-white, near-black, and very desaturated colors
-        const brightness = (c[0] + c[1] + c[2]) / 3;
-        if (brightness > 240 || brightness < 15) return false;
-        const max = Math.max(c[0], c[1], c[2]);
-        const min = Math.min(c[0], c[1], c[2]);
-        const saturation = max === 0 ? 0 : (max - min) / max;
-        if (saturation < 0.08) return false; // too gray
-        return true;
+      return buckets.map(bucket => {
+        let r = 0, g = 0, b = 0;
+        for (const p of bucket) { r += p[0]; g += p[1]; b += p[2]; }
+        const n = bucket.length;
+        return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
       });
     }
 
@@ -740,17 +795,18 @@
         pixels.push([r, g, b]);
       }
 
-      // Get dominant colors
-      const colors = medianCut(pixels, 8);
+      // Get dominant colors (15 buckets for maximum coverage)
+      const rawColors = medianCut(pixels, 15);
 
-      // Sort by saturation * brightness for visual impact
-      colors.sort((a, b) => {
+      // Sort by visual impact: saturated colors first, then by brightness diversity
+      rawColors.sort((a, b) => {
         const satA = (Math.max(...a) - Math.min(...a)) / Math.max(...a);
         const satB = (Math.max(...b) - Math.min(...b)) / Math.max(...b);
         return satB - satA;
       });
 
-      return colors.slice(0, 6).map(c => ({
+      // Return ALL colors (no filtering — let user decide)
+      return rawColors.map(c => ({
         r: c[0], g: c[1], b: c[2],
         hex: rgbToHex(c[0], c[1], c[2])
       }));
@@ -792,14 +848,67 @@
       return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
-    function showColors(colors) {
+    function renderColorChips() {
       colorsRow.innerHTML = '';
-      colors.forEach(c => {
+      detectedColors.forEach((c, idx) => {
         const chip = document.createElement('div');
         chip.className = 'color-chip';
-        chip.innerHTML = `<span class="color-dot" style="background:${c.hex}"></span>${c.hex}`;
+        chip.innerHTML = `
+          <input type="color" class="color-dot" value="${c.hex}" data-idx="${idx}" title="Cambiar color">
+          <input type="text" class="color-input" value="${c.hex}" data-idx="${idx}" maxlength="7">
+          <button class="color-remove" data-idx="${idx}" title="Eliminar">✕</button>
+        `;
         colorsRow.appendChild(chip);
       });
+
+      // Add color button
+      const addBtn = document.createElement('button');
+      addBtn.className = 'color-add';
+      addBtn.textContent = '+ Añadir';
+      addBtn.addEventListener('click', () => {
+        detectedColors.push({ r: 128, g: 128, b: 128, hex: '#808080' });
+        renderColorChips();
+      });
+      colorsRow.appendChild(addBtn);
+
+      // Bind events
+      colorsRow.querySelectorAll('.color-dot').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          const hex = e.target.value;
+          detectedColors[idx].hex = hex;
+          // Update text input
+          const textInput = colorsRow.querySelector(`.color-input[data-idx="${idx}"]`);
+          if (textInput) textInput.value = hex;
+        });
+      });
+
+      colorsRow.querySelectorAll('.color-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          let hex = e.target.value.trim();
+          if (!hex.startsWith('#')) hex = '#' + hex;
+          if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+            detectedColors[idx].hex = hex;
+            const colorInput = colorsRow.querySelector(`.color-dot[data-idx="${idx}"]`);
+            if (colorInput) colorInput.value = hex;
+          }
+        });
+      });
+
+      colorsRow.querySelectorAll('.color-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(e.target.dataset.idx);
+          detectedColors.splice(idx, 1);
+          renderColorChips();
+        });
+      });
+    }
+
+    function showColors(colors) {
+      detectedColors = colors;
+      renderColorChips();
       colorsSection.classList.add('visible');
     }
 
