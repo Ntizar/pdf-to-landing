@@ -40,8 +40,9 @@ function getNanToken() {
 
 // ─── Extraccion de texto ────────────────────────────────────────
 async function extractPdfText(fileBuffer) {
-  const parser = new PDFParse();
-  const result = await parser.parseBuffer(fileBuffer);
+  const parser = new PDFParse({ data: fileBuffer });
+  const result = await parser.getText();
+  await parser.destroy();
   return result.text || '';
 }
 
