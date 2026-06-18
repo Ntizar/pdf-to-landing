@@ -56,38 +56,43 @@ async function analyzeDesign(text, fileName, detectedColors) {
       'El primario debe ser el color mas dominante, el secundario el segundo mas usado, y el acento el color llamativo.'
     : '';
 
-  const systemPrompt = 'Eres un disenador UX/UI experto que analiza PDFs de propuestas de diseno web.\n' +
-    'Analiza el texto extraido y los colores visuales del PDF.\n' +
+  const systemPrompt = 'Eres un disenador UX/UI experto que analiza PDFs de propuestas de diseno web con precision quirurgica.\n' +
+    'Tu objetivo es EXTRAER la identidad visual EXACTA del PDF, no inventar nada.\n' +
     'Devuelve UN JSON VALIDO con esta estructura:\n' +
     '{\n' +
-    '  "empresa": "nombre de la empresa o proyecto",\n' +
+    '  "empresa": "nombre exacto de la empresa o proyecto como aparece en el PDF",\n' +
     '  "sector": "sector al que pertenece",\n' +
     '  "tono": "formal | informal | creativo | corporativo | minimalista | audaz",\n' +
     '  "paleta": { "primario": "#hex", "secundario": "#hex", "acento": "#hex", "fondo": "#hex", "texto": "#hex" },\n' +
-    '  "tipografia": { "heading": "serif | sans-serif | display | monospace", "body": "serif | sans-serif" },\n' +
-    '  "estilo": "descripcion corta del estilo visual (max 30 palabras)",\n' +
-    '  "secciones": [ {"tipo": "hero|about|services|portfolio|testimonials|contact|cta|pricing|faq|team|footer", "titulo": "titulo", "descripcion": "descripcion breve"} ],\n' +
+    '  "tipografia": { "heading": "serif | sans-serif | display | monospace", "body": "serif | sans-serif", "heading_weight": "bold | semibold | medium | light", "body_weight": "regular | medium | light" },\n' +
+    '  "estilo": "descripcion del estilo visual (max 40 palabras)",\n' +
+    '  "secciones": [ {"tipo": "hero|about|services|portfolio|testimonials|contact|cta|pricing|faq|team|footer", "titulo": "titulo exacto del PDF", "descripcion": "descripcion breve"} ],\n' +
     '  "colores_dominantes": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],\n' +
-    '  "elementos_visuales": ["iconos | ilustraciones | fotos | gradientes | formas geometricas"],\n' +
-    '  "inspiracion": "referencia de estilo (Stripe | Apple | Linear | Notion | Figma | etc.)",\n' +
-    '  "call_to_action": "texto del boton principal",\n' +
+    '  "elementos_visuales": ["iconos | ilustraciones | fotos | gradientes | formas geometricas | bordes redondeados | sombras"],\n' +
+    '  "inspiracion": "referencia de estilo similar",\n' +
+    '  "call_to_action": "texto exacto del boton principal del PDF",\n' +
     '  "url": "sitio web si aparece en el PDF",\n' +
-    '  "texto_hero": "texto principal del hero",\n' +
-    '  "subtitulo_hero": "subtexto del hero",\n' +
-    '  "features": [ {"titulo": "feature", "descripcion": "breve descripcion"} ],\n' +
-    '  "testimonios": [ {"texto": "cita", "autor": "nombre", "cargo": "rol"} ]\n' +
+    '  "texto_hero": "texto principal del hero EXACTO del PDF",\n' +
+    '  "subtitulo_hero": "subtexto del hero EXACTO del PDF",\n' +
+    '  "features": [ {"titulo": "feature exacto del PDF", "descripcion": "descripcion del PDF"} ],\n' +
+    '  "testimonios": [ {"texto": "cita exacta", "autor": "nombre", "cargo": "rol"} ],\n' +
+    '  "layout": "descripcion del layout: una columna, dos columnas, grid, etc.",\n' +
+    '  "espaciado": "generoso | compacto | equilibrado",\n' +
+    '  "bordes": "redondeados | cuadrados | mixtos",\n' +
+    '  "sombras": "suaves | fuertes | ninguna",\n' +
+    '  "gradientes": "si | no", si es si, descripcion breve del gradiente\n' +
     '}\n' +
-    'REGLAS CRITICAS para colores:\n' +
+    'REGLAS CRITICAS:\n' +
     '1. Responde SOLO con JSON valido, sin markdown, sin backticks\n' +
-    '2. Si no hay info para un campo, usa null o valores por defecto razonables\n' +
-    '3. Los colores DEBEN ser hex validos (ej: #FF5733)\n' +
-    '4. No inventes datos especificos si no aparecen en el PDF\n' +
-    '5. SI HAY COLORES DETECTADOS VISUALMENTE: USA ESOS como base. El primario es el color mas dominante de la marca.\n' +
-    '6. "fondo":的颜色 debe ser el color de fondo REAL del PDF (blanco, crema, oscuro, etc.)\n' +
-    '7. "texto":的颜色 debe ser el color del texto PRINCIPAL (negro, gris oscuro, etc.)\n' +
-    '8. "colores_dominantes": incluye TODOS los colores importantes: marca, fondo, texto, acentos (minimo 5)\n' +
-    '9. Si el PDF tiene verde como color de marca, el primario DEBE ser verde\n' +
-    '10. El fondo y texto son TAN IMPORTANTES como el color de marca';
+    '2. Los colores DEBEN ser hex validos (ej: #FF5733)\n' +
+    '3. SI HAY COLORES DETECTADOS VISUALMENTE: USA ESOS como base. El primario es el color mas dominante de la marca.\n' +
+    '4. "fondo": debe ser el color de fondo REAL del PDF\n' +
+    '5. "texto": debe ser el color del texto PRINCIPAL\n' +
+    '6. "colores_dominantes": incluye TODOS los colores importantes (minimo 5)\n' +
+    '7. Si el PDF tiene un color especifico como marca, el primario DEBE ser ese color\n' +
+    '8. Describe el layout EXACTAMENTE como aparece en el PDF\n' +
+    '9. NO inventes datos que no aparezcan en el PDF\n' +
+    '10. El estilo debe describir la sensacion visual real, no una interpretacion'
 
   const response = await fetch('https://api.nan.builders/v1/chat/completions', {
     method: 'POST',
@@ -144,36 +149,91 @@ async function generateLandingHTML(design) {
   let colorEnforcement = '';
 
   if (paleta.primario) {
-    colorEnforcement = '\n\nCOLOLES OBLIGATORIOS (extraidos del PDF real, NO los cambies):\n' +
-      `- primario: ${paleta.primario}\n` +
-      `- secundario: ${paleta.secundario || '#333333'}\n` +
-      `- acento: ${paleta.acento || paleta.primario}\n` +
-      `- fondo: ${paleta.fondo || '#ffffff'}\n` +
-      `- texto: ${paleta.texto || '#333333'}\n` +
+    colorEnforcement = '\n\n=== PALETA DE COLORES EXACTA (OBLIGATORIO) ===\n' +
+      `Primario: ${paleta.primario} (botones, headings, acentos principales)\n` +
+      `Secundario: ${paleta.secundario || '#333333'} (sub-headings, bordes, fondos de seccion)\n` +
+      `Acento: ${paleta.acento || paleta.primario} (hover states, elementos destacados, links)\n` +
+      `Fondo: ${paleta.fondo || '#ffffff'} (background de toda la pagina)\n` +
+      `Texto: ${paleta.texto || '#333333'} (parrafos, contenido principal)\n` +
       (detectedColors.length > 0
-        ? `- Todos los colores del PDF: ${detectedColors.join(', ')}\n`
+        ? `Colores adicionales del PDF: ${detectedColors.join(', ')}\n`
         : '') +
-      '\nUsa estos colores EXACTAMENTE en las variables CSS y en TODOS los elementos. ' +
-      'El primario para headings, botones principales y acentos. ' +
-      'El secundario para sub-headings y fondos de seccion. ' +
-      'El acento para hover states y elementos destacados. ' +
-      'NUNCA uses colores por defecto azul/naranja.';
+      'NO uses ningun otro color. Cada elemento debe usar estos colores exactamente.\n';
+  }
+
+  // Build design guidance from analysis
+  let designGuidance = '';
+  if (design.layout) designGuidance += `Layout: ${design.layout}\n`;
+  if (design.espaciado) designGuidance += `Espaciado: ${design.espaciado}\n`;
+  if (design.bordes) designGuidance += `Bordes: ${design.bordes}\n`;
+  if (design.sombras) designGuidance += `Sombras: ${design.sombras}\n`;
+  if (design.gradientes) designGuidance += `Gradientes: ${design.gradientes}\n`;
+  if (design.tipografia) {
+    designGuidance += `Tipografia heading: ${design.tipografia.heading || 'sans-serif'}, peso: ${design.tipografia.heading_weight || 'bold'}\n`;
+    designGuidance += `Tipografia body: ${design.tipografia.body || 'sans-serif'}, peso: ${design.tipografia.body_weight || 'regular'}\n`;
   }
 
   const systemPrompt = 'Eres un desarrollador frontend experto que crea landing pages HTML profesionales.\n' +
-    'Crea una landing page completa basada en el analisis de diseno proporcionado.\n' +
-    'REQUISITOS:\n' +
-    '1. Responsive (movil + desktop)\n' +
-    '2. Moderna (glassmorphism, gradientes sutiles, animaciones CSS)\n' +
-    '3. Un solo archivo HTML con todo inline (CSS + JS)\n' +
-    '4. Google Fonts: Inter para body, Space Grotesk para headings\n' +
-    '5. Footer: "Hecho con ❤️ por David Antizar"\n' +
-    '6. USAR LOS COLORES EXACTOS de la paleta del diseno (NO inventar colores)\n' +
-    '7. Incluir: Hero con CTA, servicios/features, sobre nosotros, testimonios si existen, CTA intermedio, footer\n' +
-    '8. NO usar frameworks — HTML + CSS + JS vanilla\n' +
-    '9. Animaciones fade-in al scroll con IntersectionObserver\n' +
-    '10. CSS variables con los colores exactos de la paleta\n' +
+    'Crea una landing page que sea una REPLICA FIEL del diseno original del PDF.\n' +
+    '\n' +
+    '=== GUÍA DE DISEÑO COMPLETA ===\n' +
+    'COLORES:\n' +
+    '- Usa SOLO los colores de la paleta proporcionada\n' +
+    '- CSS variables para TODOS los colores: --color-primary, --color-secondary, --color-accent, --color-bg, --color-text\n' +
+    '- Nunca uses colores por defecto (azul, naranja, etc.)\n' +
+    '- Los colores del PDF son la VERDAD ABSOLUTA\n' +
+    '\n' +
+    'TIPOGRAFÍA:\n' +
+    '- Google Fonts: Inter para body, Space Grotesk para headings\n' +
+    '- Respeta el peso indicado (bold/semibold/medium/light)\n' +
+    '- Tamaños: h1 (2.5-3.5rem), h2 (1.8-2.5rem), h3 (1.2-1.5rem), body (1rem)\n' +
+    '- Line height: 1.4-1.6 para body, 1.1-1.2 para headings\n' +
+    '\n' +
+    'LAYOUT:\n' +
+    '- Respeta el layout descrito (1 columna, 2 columnas, grid, etc.)\n' +
+    '- Max-width: 1200px para desktop, padding generoso\n' +
+    '- Grid gap: 1.5-2rem\n' +
+    '- Secciones con padding vertical: 4-6rem\n' +
+    '\n' +
+    'BOTONES:\n' +
+    '- Primario: fondo con color primario, texto blanco, border-radius según diseño\n' +
+    '- Secundario: borde con color primario, fondo transparente\n' +
+    '- Hover: cambio sutil de color + sombra\n' +
+    '- Padding: 0.75rem 1.5rem, font-weight: 600\n' +
+    '\n' +
+    'CARD / GLASS:\n' +
+    '- Si el PDF usa cards: background rgba(255,255,255,0.7), backdrop-filter: blur(20px)\n' +
+    '- Border: 1px solid rgba(0,0,0,0.08)\n' +
+    '- Border-radius: según diseño (8-16px)\n' +
+    '- Box-shadow: 0 4px 24px rgba(0,0,0,0.06)\n' +
+    '\n' +
+    'ANIMACIONES:\n' +
+    '- Fade-in al scroll con IntersectionObserver\n' +
+    '- Transiciones suaves en hover (0.2-0.3s ease)\n' +
+    '- Sin animaciones excesivas (no bouncing, no spinning)\n' +
+    '\n' +
+    'ESTRUCTURA HTML:\n' +
+    '- Un solo archivo HTML con CSS + JS inline\n' +
+    '- Meta viewport para responsive\n' +
+    '- Footer: "Hecho con ❤️ por David Antizar"\n' +
+    '- NO frameworks — vanilla HTML + CSS + JS\n' +
+    '\n' +
+    'FIDELIDAD AL ORIGINAL:\n' +
+    '- Copia el TEXT exacto del PDF (hero, features, CTA)\n' +
+    '- Respeta los COLORES exactos detectados\n' +
+    '- Mantiene el ESTILO visual (minimalista, corporativo, etc.)\n' +
+    '- Respeta el ESPACIADO y proporciones\n' +
+    '- Si hay gradientes en el original, incluyelos\n' +
+    '- Si hay bordes redondeados, respétalos\n' +
+    '\n' +
     'Responde SOLO con el HTML completo, sin markdown, sin backticks.';
+
+  const userPrompt = 'Genera la landing page basada en este analisis del PDF:\n' +
+    JSON.stringify(design, null, 2) +
+    colorEnforcement +
+    (designGuidance ? '\n\n=== DETALLES DEL DISEÑO ORIGINAL ===\n' + designGuidance : '') +
+    '\n\nIMPORTANTE: El resultado debe parecerse LO MAXIMO POSSIBLE al PDF original. ' +
+    'Mismos colores, mismo estilo, misma sensacion visual.';
 
   const response = await fetch('https://api.nan.builders/v1/chat/completions', {
     method: 'POST',
@@ -181,14 +241,14 @@ async function generateLandingHTML(design) {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + token
     },
-    body: JSON.stringify({
+      body: JSON.stringify({
       model: 'qwen3.6',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Genera la landing page para: ' + JSON.stringify(design, null, 2) + colorEnforcement }
+        { role: 'user', content: userPrompt }
       ],
-      max_tokens: 8000,
-      temperature: 0.8
+      max_tokens: 10000,
+      temperature: 0.7
     })
   });
 

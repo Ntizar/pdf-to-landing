@@ -860,6 +860,25 @@
       return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
     }
 
+    // Distance between two colors in RGB space (0-441)
+    function colorDistance(c1, c2) {
+      return Math.sqrt(
+        Math.pow(c1[0] - c2[0], 2) +
+        Math.pow(c1[1] - c2[1], 2) +
+        Math.pow(c1[2] - c2[2], 2)
+      );
+    }
+
+    // Deduplicate similar colors (threshold ~30 = perceptually close)
+    function deduplicateColors(colors, threshold = 30) {
+      const unique = [];
+      for (const c of colors) {
+        const isDuplicate = unique.some(u => colorDistance([c.r, c.g, c.b], [u.r, u.g, u.b]) < threshold);
+        if (!isDuplicate) unique.push(c);
+      }
+      return unique;
+    }
+
     async function extractColorsFromPDF(file) {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -908,7 +927,7 @@
       document.getElementById('pdfPreview').classList.add('visible');
 
       // Get dominant colors from ALL pages combined
-      const rawColors = medianCut(allPixels, 15);
+      const rawColors = medianCut(allPixels, 20);
 
       rawColors.sort((a, b) => {
         const satA = (Math.max(...a) - Math.min(...a)) / Math.max(...a);
@@ -916,10 +935,16 @@
         return satB - satA;
       });
 
-      return rawColors.map(c => ({
+      // Convert to objects
+      let colors = rawColors.map(c => ({
         r: c[0], g: c[1], b: c[2],
         hex: rgbToHex(c[0], c[1], c[2])
       }));
+
+      // Deduplicate similar colors
+      colors = deduplicateColors(colors, 30);
+
+      return colors;
     }
 
     // ═══════════════════════════════════════════════════════════
