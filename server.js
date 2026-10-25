@@ -1,334 +1,392 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// server.js — PDF a landing page, con Aurora como sistema de diseño.
+//
+// Endpoints limpios (nada monolítico):
+//   POST /api/analizar     PDF + colores → identidad + 3 paletas propuestas
+//   POST /api/generar      PDF → contenido IA → 3 variantes de landing
+//   POST /api/componer     contenido + paleta + formato → variantes (sin IA)
+//   POST /api/desde-cero   sin PDF: un formato de ejemplo completo
+//   GET  /api/ejemplos     los cinco formatos de web, completos
+//   GET  /api/estado       ¿hay IA?
+//   GET  /marca/<slug>.css rampa OKLCH de la marca, generada en caliente
+//   GET  /vista/<id>       página servida para la vista previa
+//
+// El HTML generado NO lleva ni un hex a mano: lleva data-nz-marca y un <link>
+// a /marca/<slug>.css. Toda clase sale del censo de Aurora y se valida.
+// ─────────────────────────────────────────────────────────────────────────────
 import express from 'express';
 import multer from 'multer';
-import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { AURORA } from './src/aurora.mjs';
+import { generarMarca } from './src/marca.mjs';
+import { renderizar, paginaError, PLANTILLAS } from './src/bloques.mjs';
+import { analizar, generarContenido, componer, proponerPaletas, ICONOS, PALETAS_OFICIALES } from './src/generador.mjs';
+import { todos as ejemplosTodos, EJEMPLOS } from './src/ejemplos.mjs';
+import { construir as construirOpenUI, ESTILOS, TEMAS } from './src/openui-generador.mjs';
+import { catalogo as catalogoOpenUI, plantillas as plantillasOpenUI, estaListo as openuiListo, iniciar as openuiIniciar } from './src/openui.mjs';
+
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ─── Middleware base ─────────────────────────────────────────────
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '20mb' }));
 
-// ─── Multer ─────────────────────────────────────────────────────
-fs.mkdirSync(path.join(__dirname, 'uploads'), { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
-  filename: (req, file, cb) => cb(null, 'upload-' + Date.now() + '-' + file.originalname)
-});
-const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
-
-// ─── Token ──────────────────────────────────────────────────────
-function getNanToken() {
+// ── Token de la API ─────────────────────────────────────────────────────────
+function getToken() {
   if (process.env.NAN_API) return process.env.NAN_API;
   try {
-    const envPath = path.join(__dirname, '.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    const match = envContent.match(/^NAN_API=(.+)$/m);
-    if (match) return match[1].trim();
-  } catch (e) {}
+    const m = fs.readFileSync(path.join(__dirname, '.env'), 'utf8').match(/^NAN_API=(.+)$/m);
+    if (m) return m[1].trim();
+  } catch { /* sin .env: se usa el respaldo de plantilla */ }
   return '';
 }
 
-// ─── Extraccion de texto ────────────────────────────────────────
-async function extractPdfText(fileBuffer) {
-  const data = await pdfParse(fileBuffer);
-  return data.text;
-}
+// ── Multer en memoria: el PDF no se guarda en disco (es un dato del usuario) ──
+const subida = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
 
-// ─── Analisis de diseno con IA (mejorado con colores reales) ───
-async function analyzeDesign(text, fileName, detectedColors) {
-  const token = getNanToken();
-  if (!token) throw new Error('Token de NaN API no configurado');
+// ── Almacén de páginas para la vista previa ─────────────────────────────────
+const VISTAS = path.join(__dirname, 'vistas');
+fs.mkdirSync(VISTAS, { recursive: true });
 
-  const colorInfo = detectedColors && detectedColors.length > 0
-    ? '\n\nCOLORES REALES extraidos visualmente del PDF (OBLIGATORIO usar estos como base):\n' +
-      detectedColors.map((c, i) => `  ${i + 1}. ${c} (extraido del pixel real del PDF)`).join('\n') +
-      '\n\nEstos colores fueron detectados al renderizar las paginas del PDF. DEBES usarlos como base para la paleta. ' +
-      'El primario debe ser el color mas dominante, el secundario el segundo mas usado, y el acento el color llamativo.'
-    : '';
-
-  const systemPrompt = 'Eres un disenador UX/UI experto que analiza PDFs de propuestas de diseno web con precision quirurgica.\n' +
-    'Tu objetivo es EXTRAER la identidad visual EXACTA del PDF, no inventar nada.\n' +
-    'Devuelve UN JSON VALIDO con esta estructura:\n' +
-    '{\n' +
-    '  "empresa": "nombre exacto de la empresa o proyecto como aparece en el PDF",\n' +
-    '  "sector": "sector al que pertenece",\n' +
-    '  "tono": "formal | informal | creativo | corporativo | minimalista | audaz",\n' +
-    '  "paleta": { "primario": "#hex", "secundario": "#hex", "acento": "#hex", "fondo": "#hex", "texto": "#hex" },\n' +
-    '  "tipografia": { "heading": "serif | sans-serif | display | monospace", "body": "serif | sans-serif", "heading_weight": "bold | semibold | medium | light", "body_weight": "regular | medium | light" },\n' +
-    '  "estilo": "descripcion del estilo visual (max 40 palabras)",\n' +
-    '  "secciones": [ {"tipo": "hero|about|services|portfolio|testimonials|contact|cta|pricing|faq|team|footer", "titulo": "titulo exacto del PDF", "descripcion": "descripcion breve"} ],\n' +
-    '  "colores_dominantes": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],\n' +
-    '  "elementos_visuales": ["iconos | ilustraciones | fotos | gradientes | formas geometricas | bordes redondeados | sombras"],\n' +
-    '  "inspiracion": "referencia de estilo similar",\n' +
-    '  "call_to_action": "texto exacto del boton principal del PDF",\n' +
-    '  "url": "sitio web si aparece en el PDF",\n' +
-    '  "texto_hero": "texto principal del hero EXACTO del PDF",\n' +
-    '  "subtitulo_hero": "subtexto del hero EXACTO del PDF",\n' +
-    '  "features": [ {"titulo": "feature exacto del PDF", "descripcion": "descripcion del PDF"} ],\n' +
-    '  "testimonios": [ {"texto": "cita exacta", "autor": "nombre", "cargo": "rol"} ],\n' +
-    '  "layout": "descripcion del layout: una columna, dos columnas, grid, etc.",\n' +
-    '  "espaciado": "generoso | compacto | equilibrado",\n' +
-    '  "bordes": "redondeados | cuadrados | mixtos",\n' +
-    '  "sombras": "suaves | fuertes | ninguna",\n' +
-    '  "gradientes": "si | no", si es si, descripcion breve del gradiente\n' +
-    '}\n' +
-    'REGLAS CRITICAS:\n' +
-    '1. Responde SOLO con JSON valido, sin markdown, sin backticks\n' +
-    '2. Los colores DEBEN ser hex validos (ej: #FF5733)\n' +
-    '3. SI HAY COLORES DETECTADOS VISUALMENTE: USA ESOS como base. El primario es el color mas dominante de la marca.\n' +
-    '4. "fondo": debe ser el color de fondo REAL del PDF\n' +
-    '5. "texto": debe ser el color del texto PRINCIPAL\n' +
-    '6. "colores_dominantes": incluye TODOS los colores importantes (minimo 5)\n' +
-    '7. Si el PDF tiene un color especifico como marca, el primario DEBE ser ese color\n' +
-    '8. Describe el layout EXACTAMENTE como aparece en el PDF\n' +
-    '9. NO inventes datos que no aparezcan en el PDF\n' +
-    '10. El estilo debe describir la sensacion visual real, no una interpretacion'
-
-  const response = await fetch('https://api.nan.builders/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + token
-    },
-    body: JSON.stringify({
-      model: 'qwen3.6',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Analiza este PDF: ' + fileName + '\n\nTexto extraido:\n' + text.substring(0, 8000) + colorInfo }
-      ],
-      max_tokens: 2000,
-      temperature: 0.7
-    })
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error('Error API NaN: ' + response.status + ' ' + err.substring(0, 200));
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || '';
-
-  // Limpiar tags think de qwen3
-  let clean = content;
-  const thinkStart = clean.indexOf('<think>');
-  const thinkEnd = clean.indexOf('</think>');
-  if (thinkStart !== -1 && thinkEnd !== -1) {
-    clean = clean.substring(0, thinkStart) + clean.substring(thinkEnd + 8);
-  }
-  clean = clean.trim();
-
-  // Extraer JSON (puede estar envuelto en ```json)
-  const jsonStart = clean.indexOf('{');
-  const jsonEnd = clean.lastIndexOf('}');
-  if (jsonStart !== -1 && jsonEnd !== -1) {
-    clean = clean.substring(jsonStart, jsonEnd + 1);
-  }
-
-  return JSON.parse(clean);
-}
-
-// ─── Generacion de HTML (mejorado con colores exactos) ──────────
-async function generateLandingHTML(design) {
-  const token = getNanToken();
-  if (!token) throw new Error('Token de NaN API no configurado');
-
-  // Build color enforcement block
-  const paleta = design.paleta || {};
-  const detectedColors = design._detectedColors || [];
-  let colorEnforcement = '';
-
-  if (paleta.primario) {
-    colorEnforcement = '\n\n=== PALETA DE COLORES EXACTA (OBLIGATORIO) ===\n' +
-      `Primario: ${paleta.primario} (botones, headings, acentos principales)\n` +
-      `Secundario: ${paleta.secundario || '#333333'} (sub-headings, bordes, fondos de seccion)\n` +
-      `Acento: ${paleta.acento || paleta.primario} (hover states, elementos destacados, links)\n` +
-      `Fondo: ${paleta.fondo || '#ffffff'} (background de toda la pagina)\n` +
-      `Texto: ${paleta.texto || '#333333'} (parrafos, contenido principal)\n` +
-      (detectedColors.length > 0
-        ? `Colores adicionales del PDF: ${detectedColors.join(', ')}\n`
-        : '') +
-      'NO uses ningun otro color. Cada elemento debe usar estos colores exactamente.\n';
-  }
-
-  // Build design guidance from analysis
-  let designGuidance = '';
-  if (design.layout) designGuidance += `Layout: ${design.layout}\n`;
-  if (design.espaciado) designGuidance += `Espaciado: ${design.espaciado}\n`;
-  if (design.bordes) designGuidance += `Bordes: ${design.bordes}\n`;
-  if (design.sombras) designGuidance += `Sombras: ${design.sombras}\n`;
-  if (design.gradientes) designGuidance += `Gradientes: ${design.gradientes}\n`;
-  if (design.tipografia) {
-    designGuidance += `Tipografia heading: ${design.tipografia.heading || 'sans-serif'}, peso: ${design.tipografia.heading_weight || 'bold'}\n`;
-    designGuidance += `Tipografia body: ${design.tipografia.body || 'sans-serif'}, peso: ${design.tipografia.body_weight || 'regular'}\n`;
-  }
-
-  const systemPrompt = 'Eres un desarrollador frontend experto que crea landing pages HTML profesionales.\n' +
-    'Crea una landing page que sea una REPLICA FIEL del diseno original del PDF.\n' +
-    '\n' +
-    '=== GUÍA DE DISEÑO COMPLETA ===\n' +
-    'COLORES:\n' +
-    '- Usa SOLO los colores de la paleta proporcionada\n' +
-    '- CSS variables para TODOS los colores: --color-primary, --color-secondary, --color-accent, --color-bg, --color-text\n' +
-    '- Nunca uses colores por defecto (azul, naranja, etc.)\n' +
-    '- Los colores del PDF son la VERDAD ABSOLUTA\n' +
-    '\n' +
-    'TIPOGRAFÍA:\n' +
-    '- Google Fonts: Inter para body, Space Grotesk para headings\n' +
-    '- Respeta el peso indicado (bold/semibold/medium/light)\n' +
-    '- Tamaños: h1 (2.5-3.5rem), h2 (1.8-2.5rem), h3 (1.2-1.5rem), body (1rem)\n' +
-    '- Line height: 1.4-1.6 para body, 1.1-1.2 para headings\n' +
-    '\n' +
-    'LAYOUT:\n' +
-    '- Respeta el layout descrito (1 columna, 2 columnas, grid, etc.)\n' +
-    '- Max-width: 1200px para desktop, padding generoso\n' +
-    '- Grid gap: 1.5-2rem\n' +
-    '- Secciones con padding vertical: 4-6rem\n' +
-    '\n' +
-    'BOTONES:\n' +
-    '- Primario: fondo con color primario, texto blanco, border-radius según diseño\n' +
-    '- Secundario: borde con color primario, fondo transparente\n' +
-    '- Hover: cambio sutil de color + sombra\n' +
-    '- Padding: 0.75rem 1.5rem, font-weight: 600\n' +
-    '\n' +
-    'CARD / GLASS:\n' +
-    '- Si el PDF usa cards: background rgba(255,255,255,0.7), backdrop-filter: blur(20px)\n' +
-    '- Border: 1px solid rgba(0,0,0,0.08)\n' +
-    '- Border-radius: según diseño (8-16px)\n' +
-    '- Box-shadow: 0 4px 24px rgba(0,0,0,0.06)\n' +
-    '\n' +
-    'ANIMACIONES:\n' +
-    '- Fade-in al scroll con IntersectionObserver\n' +
-    '- Transiciones suaves en hover (0.2-0.3s ease)\n' +
-    '- Sin animaciones excesivas (no bouncing, no spinning)\n' +
-    '\n' +
-    'ESTRUCTURA HTML:\n' +
-    '- Un solo archivo HTML con CSS + JS inline\n' +
-    '- Meta viewport para responsive\n' +
-    '- Footer: "Hecho con ❤️ por David Antizar"\n' +
-    '- NO frameworks — vanilla HTML + CSS + JS\n' +
-    '\n' +
-    'FIDELIDAD AL ORIGINAL:\n' +
-    '- Copia el TEXT exacto del PDF (hero, features, CTA)\n' +
-    '- Respeta los COLORES exactos detectados\n' +
-    '- Mantiene el ESTILO visual (minimalista, corporativo, etc.)\n' +
-    '- Respeta el ESPACIADO y proporciones\n' +
-    '- Si hay gradientes en el original, incluyelos\n' +
-    '- Si hay bordes redondeados, respétalos\n' +
-    '\n' +
-    'Responde SOLO con el HTML completo, sin markdown, sin backticks.';
-
-  const userPrompt = 'Genera la landing page basada en este analisis del PDF:\n' +
-    JSON.stringify(design, null, 2) +
-    colorEnforcement +
-    (designGuidance ? '\n\n=== DETALLES DEL DISEÑO ORIGINAL ===\n' + designGuidance : '') +
-    '\n\nIMPORTANTE: El resultado debe parecerse LO MAXIMO POSSIBLE al PDF original. ' +
-    'Mismos colores, mismo estilo, misma sensacion visual.';
-
-  const response = await fetch('https://api.nan.builders/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + token
-    },
-      body: JSON.stringify({
-      model: 'qwen3.6',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      max_tokens: 10000,
-      temperature: 0.7
-    })
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error('Error API NaN: ' + response.status + ' ' + err.substring(0, 200));
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || '';
-
-  // Limpiar markdown wrapping
-  let html = content.replace(/```html\n?/g, '').replace(/```/g, '').trim();
-  if (!html.startsWith('<!DOCTYPE')) {
-    html = '<!DOCTYPE html>\n' + html;
-  }
-  return html;
-}
-
-// ─── Handlers ───────────────────────────────────────────────────
-async function handleAnalyze(req, res) {
+function limpiarVistas() {
+  const limite = Date.now() - 6 * 3600 * 1000;
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No se subio ningun PDF' });
+    for (const f of fs.readdirSync(VISTAS)) {
+      const p = path.join(VISTAS, f);
+      if (fs.statSync(p).mtimeMs < limite) fs.unlinkSync(p);
+    }
+  } catch { /* la limpieza nunca debe tumbar una petición */ }
+}
+
+// Devuelve la URL pública de la página (con .html), no el id a secas: la vista
+// previa apuntaba a /vista/<id> y express.static responde 404 sin extensión.
+function guardarVista(html) {
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  fs.writeFileSync(path.join(VISTAS, `${id}.html`), html);
+  return `/vista/${id}.html`;
+}
+
+// ── Utilidades ──────────────────────────────────────────────────────────────
+function coloresDe(req) {
+  const crudo = req.body?.colores;
+  if (!crudo) return [];
+  try {
+    const c = typeof crudo === 'string' ? JSON.parse(crudo) : crudo;
+    return Array.isArray(c) ? c : [];
+  } catch { return []; }
+}
+
+// Dos motores: `openui` (el modelo compone con 36 componentes) y `bloques`
+// (composición fija del sistema). OpenUI es el de por defecto: es el que da
+// variedad de verdad; bloques queda como red de seguridad.
+function modoPedido(req) {
+  const m = String(req.body?.modo || '').toLowerCase();
+  return m === 'bloques' ? 'bloques' : 'openui';
+}
+
+function estiloPedido(req) {
+  const e = String(req.body?.estilo || '').toLowerCase();
+  return ESTILOS[e] ? e : 'producto';
+}
+
+function temaPedido(req) {
+  const t = String(req.body?.tema || '').toLowerCase();
+  return TEMAS[t] ? t : 'claro';
+}
+
+function plantillaPedida(req, porDefecto = 'clasica') {
+  const p = req.body?.plantilla || porDefecto;
+  return PLANTILLAS[p] ? p : porDefecto;
+}
+
+function fallo(res, mensaje, estado = 500) {
+  console.error('· ' + mensaje);
+  res.status(estado).json({ ok: false, error: mensaje });
+}
+
+// ── POST /api/analizar ──────────────────────────────────────────────────────
+async function handleAnalizar(req, res) {
+  try {
+    if (!req.file) return fallo(res, 'No llegó ningún PDF.', 400);
+    let texto = '';
+    try {
+      const data = await pdfParse(req.file.buffer);
+      texto = data.text || '';
+    } catch {
+      return fallo(res, 'No se pudo leer el PDF. Puede estar protegido; prueba a exportarlo de nuevo.', 422);
+    }
+    if (texto.trim().length < 40) {
+      return fallo(res, 'El PDF no tiene texto seleccionable (parece un escaneo). Prueba con la versión digital del documento.', 422);
     }
 
-    const fileBuffer = fs.readFileSync(req.file.path);
-    const fileName = req.file.originalname;
+    const colores = coloresDe(req);
+    const nombreFichero = path.basename(req.file.originalname || 'documento.pdf');
+    const token = getToken();
 
-    // Accept detected colors from client (extracted via pdf.js + median cut)
-    const detectedColors = req.body.detectedColors
-      ? JSON.parse(req.body.detectedColors)
-      : [];
-
-    const text = await extractPdfText(fileBuffer);
-    const design = await analyzeDesign(text, fileName, detectedColors);
-
-    // Limpiar archivo temporal
-    try { fs.unlinkSync(req.file.path); } catch (e) {}
-
-    res.json({ success: true, design });
-  } catch (err) {
-    console.error('Error en /api/analyze:', err);
-    if (req.file) try { fs.unlinkSync(req.file.path); } catch (e) {}
-    res.status(500).json({ error: err.message || 'Error analizando el PDF' });
-  }
-}
-
-async function handleGenerate(req, res) {
-  try {
-    const { design } = req.body;
-    if (!design) {
-      return res.status(400).json({ error: 'Datos de diseno requeridos' });
+    if (!token) {
+      return res.json({
+        ok: true, sinIA: true,
+        design: { empresa: nombreFichero.replace(/\.pdf$/i, ''), sector: '', plantilla: 'clasica' },
+        paletas: proponerPaletas(colores),
+        aviso: 'Falta el token de la API: se propone un formato sin análisis de contenido.',
+      });
     }
 
-    const html = await generateLandingHTML(design);
-    res.json({ success: true, html });
+    const { design, paletas, tokens } = await analizar({ token, texto, nombreFichero, colores });
+    console.log(`· analizar ${nombreFichero} · ${texto.length} car · ${JSON.stringify(tokens)}`);
+    res.json({ ok: true, design, paletas, textoCaracteres: texto.length, tokens });
   } catch (err) {
-    console.error('Error en /api/generate:', err);
-    res.status(500).json({ error: err.message || 'Error generando la landing' });
+    fallo(res, 'No se pudo analizar el PDF: ' + err.message);
   }
 }
 
-// ─── Rutas API (ANTES de static) ────────────────────────────────
-app.post('/api/analyze', upload.single('pdf'), handleAnalyze);
-app.post('/api/generate', handleGenerate);
+// ── POST /api/componer — sin IA ─────────────────────────────────────────────
+function handleComponer(req, res) {
+  try {
+    const { contenido } = req.body || {};
+    if (!contenido) return fallo(res, 'Faltan los datos del contenido.', 400);
+    const plantilla = plantillaPedida(req);
+    const lista = (req.body.paletas && req.body.paletas.length ? req.body.paletas : proponerPaletas([])).slice(0, 3);
+    const out = componer({ contenido, design: req.body.design || {}, paletas: lista, plantilla });
+    res.json({
+      ok: true, plantilla, nombrePlantilla: out.nombrePlantilla,
+      vistas: out.variantes.map((v) => ({
+        id: v.id, etiqueta: v.etiqueta, descripcion: v.descripcion, esRecomendada: v.esRecomendada,
+        marca: v.marca, contraste: v.contraste, bloques: v.bloques, packs: v.packs,
+        url: guardarVista(v.html),
+      })),
+    });
+  } catch (err) {
+    fallo(res, 'No se pudo componer la página: ' + err.message);
+  }
+}
 
-// ─── Static files (DESPUES de API routes) ───────────────────────
+// ── POST /api/desde-cero — un formato de ejemplo, completo ──────────────────
+function handleDesdeCero(req, res) {
+  try {
+    const plantilla = plantillaPedida(req);
+    const ejemplo = EJEMPLOS.find((e) => e.plantilla === plantilla) || EJEMPLOS[0];
+    const generado = ejemplosTodos().find((e) => e.slug === ejemplo.slug);
+    res.json({
+      ok: true, plantilla,
+      nombrePlantilla: PLANTILLAS[plantilla].nombre,
+      url: guardarVista(generado.html),
+      bloques: generado.bloques,
+    });
+  } catch (err) {
+    fallo(res, 'No se pudo crear el ejemplo: ' + err.message);
+  }
+}
+
+// Página de respaldo: el ejemplo de ese formato, con la marca del usuario
+function respaldoDe(plantilla, paleta, motivo) {
+  const ejemplo = EJEMPLOS.find((e) => e.plantilla === plantilla) || EJEMPLOS[0];
+  const generado = ejemplosTodos().find((e) => e.slug === ejemplo.slug);
+  const html = generado.html.replace(`/marca/${generado.marca.nombre}.css`, `/marca/${paleta.nombre}.css`);
+  return { url: guardarVista(html), motivo };
+}
+
+// ── POST /api/generar — la cadena completa con IA ───────────────────────────
+async function handleGenerar(req, res) {
+  try {
+    if (!req.file) return fallo(res, 'Falta el PDF.', 400);
+    let texto = '';
+    try {
+      const data = await pdfParse(req.file.buffer);
+      texto = data.text || '';
+    } catch {
+      return fallo(res, 'No se pudo leer el PDF.', 422);
+    }
+    if (texto.trim().length < 40) {
+      return fallo(res, 'El PDF no tiene texto seleccionable (parece un escaneo). Prueba con la versión digital.', 422);
+    }
+
+    const colores = coloresDe(req);
+    const plantilla = plantillaPedida(req);
+    const nombreFichero = path.basename(req.file.originalname || 'documento.pdf');
+    const token = getToken();
+    const paletasIniciales = proponerPaletas(colores);
+
+    if (!token) {
+      const r = respaldoDe(plantilla, paletasIniciales[0], 'Sin token de la API: se muestra una vista de ejemplo de ese formato.');
+      return res.json({ ok: true, degradado: true, plantilla, nombrePlantilla: PLANTILLAS[plantilla].nombre, ...r });
+    }
+
+    let design = {};
+    let paletas = paletasIniciales;
+    try {
+      const a = await analizar({ token, texto, nombreFichero, colores });
+      design = a.design || {};
+      paletas = a.paletas || paletasIniciales;
+    } catch (e) {
+      console.error('· análisis falló, sigo con la plantilla:', e.message);
+    }
+
+    const modo = modoPedido(req);
+    const estilo = estiloPedido(req);
+    const tema = temaPedido(req);
+    const marca = { nombre: paletas[0].nombre, marca: paletas[0].marca, acento: paletas[0].acento };
+
+    // ── MODO OPENUI: el modelo compone con los 36 componentes ──────────────
+    // Es el modo que da variedad: el mismo negocio con otro estilo produce otra
+    // estructura. Si el programa no sale, se cae al modo de bloques.
+    if (modo === 'openui') {
+      try {
+        const r = await construirOpenUI({ token, design, texto, estilo, tema, marca });
+        if (r.ok) {
+          console.log(`· openui ${nombreFichero} · ${estilo}/${tema} · ${r.nodos} nodos · ${Object.keys(r.componentes).length} componentes · ${r.intentos} intento(s)`);
+          res.json({
+            ok: true, modo: 'openui', estilo, tema,
+            estiloNombre: ESTILOS[estilo].nombre, temaNombre: TEMAS[tema].nombre,
+            design, marca,
+            url: guardarVista(r.html),
+            programa: r.programa,
+            componentes: r.componentes,
+            packs: r.packs,
+            nodos: r.nodos,
+            intentos: r.intentos,
+            avisos: r.avisos,
+            ajustesColor: r.ajustesColor,
+          });
+          limpiarVistas();
+          return;
+        }
+        console.error('· openui no llegó a buen puerto:', r.errores.join(' | '));
+        // se guarda el motivo y se sigue al modo de bloques
+        var motivoOpenUI = r.errores.slice(0, 2).join(' · ');
+      } catch (e) {
+        console.error('· openui falló:', e.message);
+        var motivoOpenUI = e.message;
+      }
+    }
+
+    let contenido;
+    let razon = 0;
+    try {
+      const g = await generarContenido({ token, design, texto, plantilla });
+      contenido = g.contenido;
+      razon = g.razon;
+    } catch (e) {
+      console.error('· contenido falló:', e.message);
+      const r = respaldoDe(plantilla, paletas[0], 'La IA no respondió a tiempo. Se muestra una vista de ejemplo de ese formato: vuelve a intentarlo.');
+      return res.json({ ok: true, degradado: true, plantilla, nombrePlantilla: PLANTILLAS[plantilla].nombre, design, ...r });
+    }
+
+    const out = componer({ contenido, design, paletas, plantilla });
+    console.log(`· generar ${nombreFichero} · ${plantilla} · ${out.variantes[0].bloques.length} bloques · razonamiento ${razon} car`);
+
+    res.json({
+      ok: true, modo: 'bloques', plantilla, nombrePlantilla: out.nombrePlantilla,
+      motivoCambioModo: typeof motivoOpenUI === 'string' ? motivoOpenUI : undefined,
+      design, contenido: out.contenido, razonamiento: razon,
+      vistas: out.variantes.map((v) => ({
+        id: v.id, etiqueta: v.etiqueta, descripcion: v.descripcion, esRecomendada: v.esRecomendada,
+        marca: v.marca, contraste: v.contraste, bloques: v.bloques, packs: v.packs,
+        url: guardarVista(v.html),
+      })),
+    });
+    limpiarVistas();
+  } catch (err) {
+    fallo(res, 'No se pudo generar la landing: ' + err.message);
+  }
+}
+
+// ── Marca en caliente ───────────────────────────────────────────────────────
+const PALETAS_SISTEMA = Object.fromEntries(PALETAS_OFICIALES.map((p) => [p.nombre, p]));
+const MARCAS_CACHE = new Map();
+
+app.get('/marca/:slug.css', (req, res) => {
+  const slug = String(req.params.slug || 'aurora').replace(/[^a-z0-9-]/gi, '').slice(0, 32) || 'aurora';
+  const color = /^#[0-9a-f]{6}$/i.test(req.query.c || '') ? req.query.c : null;
+  const acento = /^#[0-9a-f]{6}$/i.test(req.query.a || '') ? req.query.a : null;
+  const clave = `${slug}|${color}|${acento}`;
+  let css = MARCAS_CACHE.get(clave);
+  if (!css) {
+    const base = PALETAS_SISTEMA[slug] || { marca: '#2563eb', acento: '#f97316' };
+    css = generarMarca(slug, color || base.marca, acento || base.acento).css;
+    MARCAS_CACHE.set(clave, css);
+  }
+  res.type('text/css').set('Cache-Control', 'public, max-age=86400').send(css);
+});
+
+// ── Rutas ───────────────────────────────────────────────────────────────────
+app.post('/api/analizar', subida.single('pdf'), handleAnalizar);
+app.post('/api/generar', subida.single('pdf'), handleGenerar);
+app.post('/api/componer', handleComponer);
+app.post('/api/desde-cero', handleDesdeCero);
+
+app.get('/api/ejemplos', (req, res) => {
+  try {
+    res.json({
+      ok: true,
+      plantillas: Object.entries(PLANTILLAS).map(([id, p]) => ({ id, nombre: p.nombre, descripcion: p.descripcion })),
+      ejemplos: ejemplosTodos().map((e) => ({
+        slug: e.slug, formato: e.formato, resumen: e.resumen, empresa: e.empresa,
+        plantilla: e.plantilla, nombrePlantilla: e.nombrePlantilla,
+        bloques: e.bloques, packs: e.packs, marca: e.marca,
+        url: guardarVista(e.html),
+      })),
+      iconos: ICONOS.map(([nombre]) => nombre),
+    });
+  } catch (err) {
+    fallo(res, 'No se pudieron listar los ejemplos: ' + err.message);
+  }
+});
+
+app.get('/api/motores', (req, res) => {
+  res.json({
+    ok: true,
+    modos: [
+      { id: 'openui', nombre: 'Libre', descripcion: 'El modelo compone con 36 componentes: cada negocio sale distinto.' },
+      { id: 'bloques', nombre: 'Composición fija', descripcion: 'Bloques del sistema en un orden probado. Más predecible.' },
+    ],
+    estilos: Object.entries(ESTILOS).map(([id, e]) => ({ id, nombre: e.nombre, descripcion: e.descripcion })),
+    temas: Object.entries(TEMAS).map(([id, t]) => ({ id, nombre: t.nombre, descripcion: t.descripcion })),
+    componentes: catalogoOpenUI().length,
+    plantillas: plantillasOpenUI().length,
+    openuiListo: openuiListo(),
+  });
+});
+
+app.get('/api/aurora', (req, res) => {
+  res.json({ ok: true, version: AURORA.version, cdn: AURORA.cdn, clases: Object.keys(AURORA.clases).length, packs: AURORA.packs.length });
+});
+
+app.get('/api/estado', (req, res) => {
+  res.json({ ok: true, ia: Boolean(getToken()), version: AURORA.version, uptime: Math.round(process.uptime()) });
+});
+
+app.use('/vista', express.static(VISTAS));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── Health Check ───────────────────────────────────────────────
-app.get('/healthz', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
+app.get('/healthz', (req, res) => res.json({ ok: true, uptime: Math.round(process.uptime()) }));
+
+app.use((req, res) => {
+  if (req.path.startsWith('/api/')) return fallo(res, 'Ruta no encontrada: ' + req.path, 404);
+  res.status(404).type('html').send(paginaError({
+    titulo: 'Esa página no existe',
+    texto: 'La dirección que buscas no está en esta aplicación.',
+    detalle: 'Vuelve al inicio para generar tu landing page.',
+  }));
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+const servidor = app.listen(PORT, () => {
+  console.log(`PDF a Landing · Aurora ${AURORA.version} · http://localhost:${PORT} · IA ${getToken() ? 'lista' : 'sin token'}`);
+  // El runtime de OpenUI se carga una vez al arrancar: si fallara, el modo libre
+  // avisa y la app sigue sirviendo el modo de bloques.
+  openuiIniciar()
+    .then(() => console.log(`· OpenUI listo · ${catalogoOpenUI().length} componentes · parser ${'local'}`))
+    .catch((e) => console.error('· OpenUI no disponible:', e.message));
 });
-
-// ─── Start ──────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log('PDF-to-Landing v3 corriendo en http://localhost:' + PORT);
-});
+servidor.requestTimeout = 5 * 60 * 1000;
+servidor.headersTimeout = 5 * 60 * 1000;

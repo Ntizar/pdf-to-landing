@@ -1,1329 +1,759 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-nz-theme="light" data-nz-marca="aurora">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PDF → Landing Page | Generador IA</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #f8fafc;
-      --surface: rgba(255,255,255,0.72);
-      --surface-strong: rgba(255,255,255,0.88);
-      --border: rgba(255,255,255,0.6);
-      --shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
-      --shadow-hover: 0 16px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
-      --blur: blur(24px) saturate(180%);
-      --text: #0f172a;
-      --text-secondary: #475569;
-      --text-muted: #94a3b8;
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-      --accent: #f97316;
-      --radius: 16px;
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-display: 'Space Grotesk', sans-serif;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: var(--font-sans);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Three.js canvas */
-    #three-bg {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    /* Background overlays */
-    body::before {
-      content: "";
-      position: fixed; inset: 0;
-      background:
-        radial-gradient(ellipse 800px 600px at 15% 20%, rgba(37,99,235,0.06) 0%, transparent 60%),
-        radial-gradient(ellipse 600px 500px at 85% 80%, rgba(249,115,22,0.05) 0%, transparent 60%);
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    .app { position: relative; z-index: 2; }
-
-    /* Glass card */
-    .glass {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      backdrop-filter: var(--blur);
-      -webkit-backdrop-filter: var(--blur);
-    }
-    .glass::before {
-      content: "";
-      position: absolute; inset: 0;
-      border-radius: inherit;
-      background: linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.08) 40%, transparent 60%);
-      pointer-events: none;
-    }
-
-    /* Header */
-    .header {
-      padding: 2rem 2rem 1rem;
-      text-align: center;
-    }
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 1rem;
-      border-radius: 999px;
-      background: rgba(37,99,235,0.08);
-      color: var(--primary);
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      margin-bottom: 1rem;
-    }
-    .header h1 {
-      font-family: var(--font-display);
-      font-size: clamp(2rem, 5vw, 3.2rem);
-      font-weight: 700;
-      color: var(--text);
-      line-height: 1.15;
-      margin-bottom: 0.5rem;
-    }
-    .header h1 .accent { color: var(--primary); }
-    .header p {
-      color: var(--text-secondary);
-      font-size: 1.05rem;
-      max-width: 520px;
-      margin: 0 auto;
-    }
-
-    /* Main container */
-    .container {
-      max-width: 780px;
-      margin: 0 auto;
-      padding: 1.5rem 2rem 4rem;
-    }
-
-    /* Upload zone */
-    .upload-zone {
-      position: relative;
-      padding: 3rem 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      margin-bottom: 1.5rem;
-    }
-    .upload-zone:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-hover);
-    }
-    .upload-zone.dragging {
-      border-color: var(--primary);
-      background: rgba(37,99,235,0.04);
-    }
-    .upload-zone.has-file {
-      padding: 1.5rem 2rem;
-    }
-    .upload-icon {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-      display: block;
-    }
-    .upload-text {
-      font-size: 1rem;
-      color: var(--text-secondary);
-      margin-bottom: 0.3rem;
-    }
-    .upload-hint {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-    }
-    .upload-zone input[type="file"] {
-      display: none;
-    }
-
-    /* File info */
-    .file-info {
-      display: none;
-      align-items: center;
-      gap: 1rem;
-      text-align: left;
-    }
-    .file-info.visible { display: flex; }
-    .file-icon {
-      width: 48px; height: 48px;
-      border-radius: 12px;
-      background: rgba(37,99,235,0.08);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.5rem;
-      flex-shrink: 0;
-    }
-    .file-details { flex: 1; min-width: 0; }
-    .file-name {
-      font-weight: 600;
-      font-size: 0.95rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .file-size {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-    .file-remove {
-      background: none; border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 1.2rem;
-      padding: 0.3rem;
-      border-radius: 8px;
-      transition: all 0.2s;
-    }
-    .file-remove:hover {
-      background: rgba(220,38,38,0.08);
-      color: #dc2626;
-    }
-
-    /* Colors preview — EDITABLE */
-    .colors-section {
-      display: none;
-      margin-bottom: 1.5rem;
-    }
-    .colors-section.visible { display: block; }
-    .colors-label {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .colors-label small {
-      font-weight: 400;
-      text-transform: none;
-      letter-spacing: 0;
-      color: var(--text-muted);
-    }
-    .colors-row {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    .color-chip {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 0.8rem 0.4rem 0.5rem;
-      border-radius: 999px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      font-size: 0.78rem;
-      font-weight: 500;
-      font-family: 'JetBrains Mono', 'Fira Code', monospace;
-      color: var(--text-secondary);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      transition: all 0.2s;
-    }
-    .color-chip:hover {
-      border-color: var(--primary);
-      box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-    }
-    .color-chip.selected {
-      border-color: var(--primary);
-      background: rgba(37,99,235,0.08);
-    }
-    .color-dot {
-      width: 18px; height: 18px;
-      border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.8);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-      flex-shrink: 0;
-      cursor: pointer;
-    }
-    .color-input {
-      width: 72px;
-      border: none;
-      background: transparent;
-      font-family: inherit;
-      font-size: inherit;
-      color: inherit;
-      outline: none;
-      cursor: pointer;
-    }
-    .color-remove {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 0.9rem;
-      padding: 0 0.2rem;
-      border-radius: 4px;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .color-chip:hover .color-remove { opacity: 1; }
-    .color-remove:hover { color: #dc2626; }
-    .color-add {
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-      padding: 0.4rem 0.8rem;
-      border-radius: 999px;
-      background: transparent;
-      border: 1.5px dashed var(--border);
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .color-add:hover {
-      border-color: var(--primary);
-      color: var(--primary);
-    }
-    .colors-hint {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-      font-style: italic;
-    }
-
-    /* PDF preview */
-    .pdf-preview {
-      display: none;
-      margin-bottom: 1.5rem;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: white;
-      max-height: 240px;
-    }
-    .pdf-preview.visible { display: block; }
-    .pdf-preview canvas {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-
-    /* Analyze button */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 0.85rem 2rem;
-      border-radius: 12px;
-      font-family: var(--font-sans);
-      font-size: 0.95rem;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      width: 100%;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: white;
-      box-shadow: 0 4px 14px rgba(37,99,235,0.3);
-    }
-    .btn-primary:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(37,99,235,0.4);
-    }
-    .btn-primary:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .btn-accent {
-      background: linear-gradient(135deg, var(--accent), #ea580c);
-      color: white;
-      box-shadow: 0 4px 14px rgba(249,115,22,0.3);
-    }
-    .btn-accent:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(249,115,22,0.4);
-    }
-    .btn-ghost {
-      background: var(--surface);
-      color: var(--text-secondary);
-      border: 1px solid var(--border);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-    .btn-ghost:hover { background: var(--surface-strong); }
-
-    /* Progress */
-    .progress-section {
-      display: none;
-      margin: 1.5rem 0;
-    }
-    .progress-section.visible { display: block; }
-    .progress-bar-bg {
-      height: 6px;
-      background: rgba(37,99,235,0.08);
-      border-radius: 999px;
-      overflow: hidden;
-      margin-bottom: 0.75rem;
-    }
-    .progress-bar {
-      height: 100%;
-      background: linear-gradient(90deg, var(--primary), var(--accent));
-      border-radius: 999px;
-      transition: width 0.5s ease;
-      width: 0%;
-    }
-    .progress-text {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      text-align: center;
-    }
-
-    /* Result section */
-    .result-section {
-      display: none;
-      margin-top: 1.5rem;
-    }
-    .result-section.visible { display: block; }
-    .result-actions {
-      display: flex;
-      gap: 0.75rem;
-      margin-top: 1rem;
-    }
-    .result-actions .btn { flex: 1; }
-
-    /* Design info card — EDITABLE */
-    .design-card {
-      padding: 1.5rem;
-      margin-bottom: 1rem;
-      position: relative;
-    }
-    .design-card h3 {
-      font-family: var(--font-display);
-      font-size: 1.1rem;
-      margin-bottom: 1rem;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .design-card h3 small {
-      font-size: 0.75rem;
-      font-weight: 400;
-      color: var(--text-muted);
-    }
-    .design-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-    }
-    .design-item {
-      padding: 0.75rem;
-      border-radius: 10px;
-      background: rgba(37,99,235,0.03);
-      border: 1px solid rgba(37,99,235,0.06);
-      transition: border-color 0.2s;
-    }
-    .design-item:hover {
-      border-color: rgba(37,99,235,0.15);
-    }
-    .design-item-label {
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.35rem;
-    }
-    .design-item-value {
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: var(--text);
-    }
-    .design-input {
-      width: 100%;
-      border: none;
-      background: transparent;
-      font-family: inherit;
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: var(--text);
-      outline: none;
-      padding: 0;
-    }
-    .design-input:focus {
-      color: var(--primary);
-    }
-    .design-textarea {
-      width: 100%;
-      border: none;
-      background: transparent;
-      font-family: inherit;
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: var(--text);
-      outline: none;
-      padding: 0;
-      resize: vertical;
-      min-height: 2.5em;
-    }
-    .design-textarea:focus {
-      color: var(--primary);
-    }
-    .design-select {
-      width: 100%;
-      border: none;
-      background: transparent;
-      font-family: inherit;
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: var(--text);
-      outline: none;
-      padding: 0;
-      cursor: pointer;
-    }
-    .design-colors-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 0.5rem;
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid rgba(37,99,235,0.08);
-    }
-    .design-color-item {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.35rem 0.6rem;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.5);
-      border: 1px solid rgba(37,99,235,0.06);
-    }
-    .design-color-item input[type="color"] {
-      width: 22px; height: 22px;
-      border: 2px solid rgba(255,255,255,0.8);
-      border-radius: 6px;
-      cursor: pointer;
-      padding: 0;
-      background: none;
-    }
-    .design-color-item input[type="text"] {
-      width: 72px;
-      border: none;
-      background: transparent;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.78rem;
-      color: var(--text-secondary);
-      outline: none;
-    }
-    .design-color-label {
-      font-size: 0.68rem;
-      color: var(--text-muted);
-      text-transform: capitalize;
-    }
-
-    /* Footer */
-    .footer {
-      text-align: center;
-      padding: 2rem;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-    .footer a {
-      color: var(--primary);
-      text-decoration: none;
-    }
-
-    /* Spinner */
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner {
-      width: 20px; height: 20px;
-      border: 2.5px solid rgba(255,255,255,0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      display: inline-block;
-    }
-
-    /* Responsive */
-    @media (max-width: 640px) {
-      .header { padding: 1.5rem 1rem 0.5rem; }
-      .container { padding: 1rem 1rem 3rem; }
-      .design-grid { grid-template-columns: 1fr; }
-      .result-actions { flex-direction: column; }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF a landing page · con Aurora</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Aurora@v10.1.0/tokens.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Aurora@v10.1.0/packs/p1-layout.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Aurora@v10.1.0/packs/p2-navigation.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Aurora@v10.1.0/packs/p3-typography.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Aurora@v10.1.0/packs/p4-actions.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Aurora@v10.1.0/packs/p5-forms.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Aurora@v10.1.0/packs/p6-feedback.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Aurora@v10.1.0/packs/p9-media.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Ntizar/Aurora@v10.1.0/packs/p12-system.css">
+<style>
+  /* Lo único propio: el marco de la herramienta. Ni un color a mano: tokens. */
+  .mm-vista { width: 100%; height: 100%; min-height: 34rem; border: 0; display: block; background: var(--nz-surface); }
+  .mm-pasos { position: sticky; top: 0; z-index: 10; background: var(--nz-bg); padding-block: var(--nz-space-2); }
+  .mm-paleta { width: 100%; text-align: left; cursor: pointer; display: block; }
+  .mm-paleta[aria-pressed="true"] { outline: 2px solid var(--nz-brand); outline-offset: 2px; }
+  .mm-muestra { display: flex; height: 2.5rem; border-radius: var(--nz-radius-md); overflow: hidden; }
+  .mm-muestra span { flex: 1; }
+  .mm-oculto { display: none !important; }
+  .mm-ejemplo { cursor: pointer; text-align: left; width: 100%; }
+  .mm-ejemplo[aria-pressed="true"] { outline: 2px solid var(--nz-brand); outline-offset: 2px; }
+  .mm-ancho { width: 100%; margin-inline: auto; transition: width .2s ease; }
+  .mm-enlace { text-decoration: none; display: block; }
+  @media (min-width: 960px) { .mm-vista { min-height: 44rem; } }
+  /* En móvil la herramienta tiene que entrar en la primera pantalla: el hero se
+     aprieta y el titular baja un escalón (el texto no cambia, la escala sí). */
+  @media (max-width: 639px) {
+    .mm-hero .nz-h1 { font-size: var(--nz-text-2xl); }
+    .mm-hero .nz-lead { font-size: var(--nz-text-md); }
+    .mm-hero-oculto-movil { display: none; }
+    /* la herramienta primero: quien entra en el móvil viene a subir el PDF */
+    .mm-hero { display: flex; flex-direction: column; }
+    .mm-hero__texto { order: 2; }
+    .mm-hero__zona { order: 1; }
+  }
+</style>
 </head>
-<body>
-  <canvas id="three-bg"></canvas>
+<body class="nz">
 
-  <div class="app">
-    <header class="header">
-      <div class="header-badge">✨ Potenciado por IA</div>
-      <h1>PDF a <span class="accent">Landing Page</span></h1>
-      <p>Sube un PDF con tu propuesta de diseño y genera una landing page profesional con los colores e identidad visual reales</p>
-    </header>
+<header class="nz-container nz-cluster nz-cluster--between nz-navbar nz-navbar--bordered" style="padding-block:var(--nz-space-3)">
+  <span class="nz-lbl nz-lbl--brand">PDF a landing</span>
+  <nav class="nz-cluster nz-cluster--compact" aria-label="Principal">
+    <a class="nz-cta nz-cta--muted" href="#formatos">Formatos</a>
+    <a class="nz-cta nz-cta--muted" href="#como">Cómo funciona</a>
+    <a class="nz-btn nz-btn--primary nz-btn--sm" href="#subir">Subir un PDF</a>
+  </nav>
+</header>
 
-    <div class="container">
-      <!-- Upload -->
-      <div class="upload-zone glass" id="uploadZone">
-        <div id="uploadPlaceholder">
-          <span class="upload-icon">📄</span>
-          <div class="upload-text">Arrastra tu PDF aquí o haz clic para seleccionar</div>
-          <div class="upload-hint">Máximo 20 MB</div>
-        </div>
-        <div class="file-info" id="fileInfo">
-          <div class="file-icon">📋</div>
-          <div class="file-details">
-            <div class="file-name" id="fileName"></div>
-            <div class="file-size" id="fileSize"></div>
+<main>
+
+  <!-- ── Hero + herramienta en la primera pantalla ───────────────────────── -->
+  <div class="nz-hero-bleed">
+    <div class="nz-container">
+      <div class="nz-split nz-split--3-2 mm-hero">
+        <div class="nz-stack mm-hero__texto">
+          <span class="nz-eyebrow">Diseño real, no una plantilla</span>
+          <h1 class="nz-h1">Tu propuesta en PDF,<br>hecha web en un minuto</h1>
+          <p class="nz-lead">Sube el PDF de tu propuesta y llévate una web de una página: con tus textos, tus colores y las secciones que necesita un negocio real. Un solo archivo, que abre en cualquier navegador.</p>
+          <div class="nz-cluster nz-cluster--compact mm-hero-oculto-movil">
+            <span class="nz-lbl">Sin registro</span>
+            <span class="nz-lbl">El PDF no se guarda</span>
+            <span class="nz-lbl">HTML descargable</span>
           </div>
-          <button class="file-remove" id="fileRemove" title="Eliminar">✕</button>
+          <a class="nz-cta nz-cta--accent mm-hero-oculto-movil" href="#formatos">Ver los 5 formatos<span class="nz-cta__arrow">→</span></a>
         </div>
-        <input type="file" id="fileInput" accept=".pdf">
-      </div>
 
-      <!-- PDF Preview -->
-      <div class="pdf-preview" id="pdfPreview">
-        <canvas id="pdfCanvas"></canvas>
-      </div>
-
-      <!-- Detected Colors — EDITABLE -->
-      <div class="colors-section" id="colorsSection">
-        <div class="colors-label">
-          🎨 Colores detectados <small>(clic para editar, ✕ para eliminar)</small>
-        </div>
-        <div class="colors-row" id="colorsRow"></div>
-        <div class="colors-hint">Estos colores se extraen del PDF. Edítalos si la IA no detectó bien alguno.</div>
-      </div>
-
-      <!-- Analyze button -->
-      <button class="btn btn-primary" id="analyzeBtn" disabled>
-        🔍 Analizar diseño con IA
-      </button>
-
-      <!-- Progress -->
-      <div class="progress-section" id="progressSection">
-        <div class="progress-bar-bg">
-          <div class="progress-bar" id="progressBar"></div>
-        </div>
-        <div class="progress-text" id="progressText">Preparando...</div>
-      </div>
-
-      <!-- Design result — EDITABLE -->
-      <div class="result-section" id="resultSection">
-        <div class="design-card glass" id="designCard">
-          <h3>✅ Diseño detectado <small>(edita antes de generar)</small></h3>
-          <div class="design-grid" id="designGrid"></div>
-          <div class="design-colors-grid" id="designColors"></div>
-        </div>
-        <div class="result-actions">
-          <button class="btn btn-accent" id="generateBtn">
-            🚀 Generar Landing Page
-          </button>
-          <button class="btn btn-ghost" id="newAnalysisBtn">
-            📄 Otro PDF
-          </button>
+        <!-- La herramienta, ya en la primera pantalla -->
+        <div id="subir" class="nz-stack nz-stack--sm mm-hero__zona">
+          <label class="nz-filezona" id="filezona" style="cursor:pointer">
+            <span class="nz-filezona__icono" aria-hidden="true">
+              <svg class="nz-icon nz-icon--lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10 9H8m8 4H8m8 4H8"/></svg>
+            </span>
+            <span class="nz-filezona__texto" id="zonaTexto">
+              <strong>Arrastra aquí tu PDF</strong>
+              <span class="nz-text--small nz-text--muted">o elige el archivo · máx. 20 MB</span>
+            </span>
+            <input type="file" id="fileInput" class="nz-filezona__input" accept="application/pdf,.pdf" aria-label="Elegir el PDF de la propuesta">
+          </label>
+          <div class="nz-cluster nz-cluster--between">
+            <button class="nz-btn nz-btn--primary nz-btn--lg nz-btn--block" id="btnElegir" type="button">Elegir PDF</button>
+            <button class="nz-btn nz-btn--outline nz-btn--block" id="btnGenerar" type="button" disabled>
+              Generar la landing
+            </button>
+          </div>
+          <span class="nz-lbl nz-lbl--lg" id="avisoFichero">Sin archivo todavía</span>
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Generated HTML download -->
-      <div class="result-section" id="htmlResult">
-        <div class="design-card glass">
-          <h3>🎉 Landing page generada</h3>
-          <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem">
-            Tu landing page está lista. Descarga el archivo HTML y ábrelo en tu navegador.
-          </p>
+  <section class="nz-container nz-stack" aria-label="Proceso y avisos">
+    <div class="mm-pasos">
+      <ol class="nz-stepper">
+        <li class="nz-stepper__step is-active" data-paso="1"><span class="nz-stepper__num">1</span>Sube el PDF</li>
+        <li class="nz-stepper__step" data-paso="2"><span class="nz-stepper__num">2</span>Elige color y formato</li>
+        <li class="nz-stepper__step" data-paso="3"><span class="nz-stepper__num">3</span>Revisa y descarga</li>
+      </ol>
+    </div>
+
+    <div class="nz-panel mm-oculto" id="panelProgreso" role="status" aria-live="polite">
+      <div class="nz-panel__cuerpo nz-stack nz-stack--sm">
+        <div class="nz-cluster nz-cluster--between">
+          <strong id="progresoTitulo">Analizando el PDF…</strong>
+          <span class="nz-lbl" id="progresoTiempo">0 s</span>
         </div>
-        <div class="result-actions">
-          <button class="btn btn-primary" id="downloadBtn">
-            ⬇️ Descargar HTML
-          </button>
-          <button class="btn btn-ghost" id="previewBtn">
-            👁️ Vista previa
-          </button>
+        <div class="nz-progress"><div class="nz-progress__bar" id="progresoBarra" style="width:8%"></div></div>
+        <p class="nz-text--small nz-text--muted" id="progresoDetalle">Extrayendo el texto del documento…</p>
+      </div>
+    </div>
+
+    <div class="nz-alert nz-alert--danger mm-oculto" id="alertaError" role="alert">
+      <div class="nz-alert__body">
+        <span class="nz-alert__title" id="errorTitulo">No se pudo</span>
+        <span class="nz-alert__msg" id="errorTexto"></span>
+      </div>
+      <button class="nz-btn nz-btn--sm nz-btn--ghost" id="btnReintentar" type="button">Reintentar</button>
+    </div>
+
+    <div class="nz-alert nz-alert--info">
+      <div class="nz-alert__body">
+        <span class="nz-alert__title">Tu documento no se queda aquí</span>
+        <span class="nz-alert__msg">Se lee en memoria para extraer el texto y detectar los colores, y se descarta al terminar. No se escribe en disco.</span>
+      </div>
+    </div>
+
+    <!-- Paso 2: color y formato -->
+    <div class="mm-oculto nz-stack" id="pasoAjustes">
+      <div class="nz-panel">
+        <div class="nz-panel__cabecera">
+          <h2 class="nz-h5">Color de la marca</h2>
+          <span class="nz-lbl" id="paletaOrigen">Detectado del PDF</span>
+        </div>
+        <div class="nz-panel__cuerpo nz-stack nz-stack--sm">
+          <p class="nz-text--small nz-text--muted">Cada paleta se genera con las rampas OKLCH del sistema y se comprueba el contraste AA. Eliges el punto de partida; el resto lo calcula Aurora.</p>
+          <div class="nz-grid-auto" id="listaPaletas"></div>
+          <details class="nz-collapsible">
+            <summary>Cambiar los colores a mano</summary>
+            <div class="nz-formgrid nz-formgrid--2" style="margin-top:var(--nz-space-3)">
+              <label class="nz-field">
+                <span class="nz-field__label">Color de marca</span>
+                <input class="nz-input" type="color" id="colorMarca" value="#2563eb">
+                <span class="nz-field__help">Botones y acciones</span>
+              </label>
+              <label class="nz-field">
+                <span class="nz-field__label">Color de acento</span>
+                <input class="nz-input" type="color" id="colorAcento" value="#f97316">
+                <span class="nz-field__help">Marca el dato que importa</span>
+              </label>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="nz-panel">
+        <div class="nz-panel__cabecera">
+          <h2 class="nz-h5">Formato de web</h2>
+          <span class="nz-lbl" id="formatoSugerido">Sugerido</span>
+        </div>
+        <div class="nz-panel__cuerpo nz-stack nz-stack--sm">
+          <div class="nz-grid-auto" id="listaFormatos"></div>
         </div>
       </div>
     </div>
 
-    <footer class="footer">
-      Hecho con ❤️ por <a href="https://github.com/Ntizar" target="_blank">David Antizar</a>
-    </footer>
-  </div>
+    <!-- Paso 3: resultado -->
+    <div class="mm-oculto nz-stack" id="pasoResultado">
+      <div class="nz-panel">
+        <div class="nz-panel__cabecera">
+          <h2 class="nz-h5" id="resultadoTitulo">Tu landing</h2>
+          <span class="nz-badge nz-badge--success" id="resultadoEstado">Lista</span>
+        </div>
+        <div class="nz-panel__cuerpo nz-stack nz-stack--sm">
+          <div class="nz-cluster nz-cluster--between">
+            <div class="nz-cluster nz-cluster--compact" id="selectorVariantes"></div>
+            <div class="nz-cluster nz-cluster--compact">
+              <button class="nz-btn nz-btn--primary nz-btn--sm" id="btnDescargar" type="button">Descargar HTML</button>
+              <a class="nz-btn nz-btn--outline nz-btn--sm" id="btnAbrir" href="#" target="_blank" rel="noopener">Abrir en pestaña</a>
+              <button class="nz-btn nz-btn--ghost nz-btn--sm" id="btnOtro" type="button">Otro PDF</button>
+            </div>
+          </div>
+          <p class="nz-text--small nz-text--muted" id="resultadoDetalle"></p>
+          <div class="nz-segmented" id="selectorVista" role="group" aria-label="Ancho de la vista previa">
+            <button data-ancho="movil" aria-selected="false" type="button">Móvil</button>
+            <button data-ancho="tablet" aria-selected="false" type="button">Tablet</button>
+            <button data-ancho="escritorio" aria-selected="true" type="button">Escritorio</button>
+          </div>
+          <div class="mm-ancho" id="marco">
+            <iframe class="mm-vista" id="vistaPrevia" title="Vista previa de la landing generada" sandbox="allow-same-origin"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <!-- Three.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- PDF.js -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 
-  <script>
-    // ═══════════════════════════════════════════════════════════
-    // THREE.JS BACKGROUND — Partículas + geometric shapes
-    // ═══════════════════════════════════════════════════════════
-    (function initThreeBackground() {
-      const canvas = document.getElementById('three-bg');
-      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  <!-- ── Cómo se diseña: los dos motores, siempre a la vista ──────────────── -->
+  <section class="nz-container nz-stack" aria-label="Cómo se diseña">
+    <div class="nz-panel">
+      <div class="nz-panel__cabecera">
+        <h2 class="nz-h5">Cómo se diseña</h2>
+        <span class="nz-lbl" id="motorResumen">36 componentes</span>
+      </div>
+      <div class="nz-panel__cuerpo nz-stack nz-stack--sm">
+        <div class="nz-segmented nz-segmented--full" id="selectorModo" role="group" aria-label="Motor de diseño">
+          <button data-modo="openui" aria-selected="true" type="button">Libre</button>
+          <button data-modo="bloques" aria-selected="false" type="button">Composición fija</button>
+        </div>
+        <p class="nz-text--small nz-text--muted" id="modoAyuda">El modelo compone con 36 componentes del sistema: cada negocio sale con una estructura distinta.</p>
 
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-      camera.position.z = 30;
+        <h3 class="nz-h6">Estilo</h3>
+        <div class="nz-grid-auto" id="listaEstilos"></div>
 
-      // Particles
-      const particleCount = 600;
-      const positions = new Float32Array(particleCount * 3);
-      const colors = new Float32Array(particleCount * 3);
-      const sizes = new Float32Array(particleCount);
+        <h3 class="nz-h6">Tema</h3>
+        <div class="nz-segmented" id="selectorTema" role="group" aria-label="Tema de color">
+          <button data-tema="claro" aria-selected="true" type="button">Claro</button>
+          <button data-tema="oscuro" aria-selected="false" type="button">Oscuro</button>
+        </div>
+      </div>
+    </div>
 
-      const palette = [
-        new THREE.Color(0x2563eb), // blue
-        new THREE.Color(0xf97316), // orange
-        new THREE.Color(0x94a3b8), // muted
-        new THREE.Color(0xe2e8f0), // light gray
-      ];
+  </section>
 
-      for (let i = 0; i < particleCount; i++) {
-        positions[i * 3] = (Math.random() - 0.5) * 80;
-        positions[i * 3 + 1] = (Math.random() - 0.5) * 60;
-        positions[i * 3 + 2] = (Math.random() - 0.5) * 40;
-        const c = palette[Math.floor(Math.random() * palette.length)];
-        colors[i * 3] = c.r;
-        colors[i * 3 + 1] = c.g;
-        colors[i * 3 + 2] = c.b;
-        sizes[i] = Math.random() * 2 + 0.5;
-      }
+  <!-- ── Formatos: los cinco ejemplos, reales ─────────────────────────────── -->
+  <section id="formatos" class="nz-container nz-stack" aria-label="Formatos de web">
+    <h2 class="nz-h3">Cinco formatos de web, no cinco plantillas</h2>
+    <p class="nz-lead nz-lead--sm">Cada ejemplo es una landing completa construida con los mismos objetos de Aurora, cambiando la composición. Todos pasan el lint del sistema sin un solo fallo. Pulsa para abrirlos de verdad.</p>
+    <div class="nz-grid-auto" id="listaEjemplos">
+      <div class="nz-skeleton"><div class="nz-skeleton__block" style="height:12rem"></div></div>
+      <div class="nz-skeleton"><div class="nz-skeleton__block" style="height:12rem"></div></div>
+      <div class="nz-skeleton"><div class="nz-skeleton__block" style="height:12rem"></div></div>
+    </div>
+  </section>
 
-      const particleGeo = new THREE.BufferGeometry();
-      particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      particleGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  <!-- ── Cómo funciona ────────────────────────────────────────────────────── -->
+  <section id="como" class="nz-container nz-stack" aria-label="Cómo funciona">
+    <h2 class="nz-h3">Qué hace la IA y qué no</h2>
+    <div class="nz-split nz-split--2-1">
+      <div class="nz-stack">
+        <p class="nz-lead nz-lead--sm">La IA escribe los textos. El diseño lo pone el sistema.</p>
+        <p>Así la página no puede salir con colores raros, botones con emoji ni cinco titulares compitiendo. No es que la IA se porte bien: es que no se le deja decidir el diseño.</p>
+        <details class="nz-collapsible">
+          <summary>El detalle técnico, si te interesa</summary>
+          <p style="margin-top:var(--nz-space-2)">El HTML se compone con objetos del design system <strong>Aurora</strong> del repositorio <a class="nz-cta nz-cta--underline" href="https://github.com/Ntizar/Aurora" target="_blank" rel="noopener">Ntizar/Aurora</a>. Antes de entregarlo se pasa por su validador: cero clases inventadas, cero gradientes fuera de norma, contraste AA comprobado. Si algo no cuadra, se corrige o no se entrega.</p>
+        </details>
+      </div>
+      <ul class="nz-list nz-list--check nz-list--divided">
+        <li class="nz-list__item"><span>Lee el texto y los colores del PDF</span></li>
+        <li class="nz-list__item"><span>Propone la identidad: nombre, sector, tono</span></li>
+        <li class="nz-list__item"><span>Elige el formato que encaja con el negocio</span></li>
+        <li class="nz-list__item"><span>Genera tres paletas con contraste AA</span></li>
+        <li class="nz-list__item"><span>Monta el HTML con objetos reales de Aurora</span></li>
+        <li class="nz-list__item"><span>Valida y te lo entrega en un solo fichero</span></li>
+      </ul>
+    </div>
+  </section>
 
-      const particleMat = new THREE.PointsMaterial({
-        size: 0.15,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.5,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const particles = new THREE.Points(particleGeo, particleMat);
-      scene.add(particles);
+  <!-- ── Cierre ───────────────────────────────────────────────────────────── -->
+  <section class="nz-container" aria-label="Empezar">
+    <div class="nz-cta-banner nz-cta-banner--bordered">
+      <span class="nz-cta-banner__eyebrow">Sin registro · sin correo</span>
+      <h2 class="nz-cta-banner__title">Tienes el PDF. Tienes la web.</h2>
+      <p class="nz-cta-banner__body">Descargas un único archivo HTML que abre en cualquier navegador y se sube a cualquier hosting. Ni dependencias ni compilación.</p>
+      <div class="nz-cta-banner__actions">
+        <a class="nz-btn nz-btn--primary" href="#subir">Subir mi PDF</a>
+        <a class="nz-cta" href="https://github.com/Ntizar/Aurora" target="_blank" rel="noopener">Ver el sistema Aurora</a>
+      </div>
+    </div>
+  </section>
 
-      // Floating geometric shapes
-      const shapes = [];
-      const shapeMat = new THREE.MeshBasicMaterial({
-        color: 0x2563eb,
-        transparent: true,
-        opacity: 0.04,
-        wireframe: true,
-      });
-      const shapeMat2 = new THREE.MeshBasicMaterial({
-        color: 0xf97316,
-        transparent: true,
-        opacity: 0.03,
-        wireframe: true,
-      });
+</main>
 
-      for (let i = 0; i < 8; i++) {
-        let geo;
-        const r = Math.random();
-        if (r < 0.33) geo = new THREE.IcosahedronGeometry(Math.random() * 3 + 1, 0);
-        else if (r < 0.66) geo = new THREE.OctahedronGeometry(Math.random() * 3 + 1, 0);
-        else geo = new THREE.TetrahedronGeometry(Math.random() * 3 + 1, 0);
+<footer class="nz-footer nz-footer--compact">
+  PDF a landing · Aurora <span id="pieVersion">v10</span> · Hecho con ❤️ por David Antizar
+</footer>
 
-        const mesh = new THREE.Mesh(geo, Math.random() > 0.5 ? shapeMat : shapeMat2);
-        mesh.position.set(
-          (Math.random() - 0.5) * 50,
-          (Math.random() - 0.5) * 40,
-          (Math.random() - 0.5) * 20 - 10
-        );
-        mesh.userData = {
-          rotSpeed: { x: Math.random() * 0.003, y: Math.random() * 0.005, z: Math.random() * 0.002 },
-          floatSpeed: Math.random() * 0.3 + 0.1,
-          floatOffset: Math.random() * Math.PI * 2,
-        };
-        scene.add(mesh);
-        shapes.push(mesh);
-      }
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
 
-      // Animation
-      let mouseX = 0, mouseY = 0;
-      document.addEventListener('mousemove', (e) => {
-        mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
-        mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
-      });
+const estado = {
+  fichero: null, colores: [], paletas: [], plantillas: [],
+  elegida: null, formato: 'clasica', resultado: null,
+  modo: 'openui', estilo: 'producto', tema: 'claro', motores: null,
+  varianteActiva: 0, html: '',
+  marca: { nombre: 'aurora', color: '#2563eb', acento: '#f97316' },
+};
 
-      function animate() {
-        requestAnimationFrame(animate);
+function marcarPaso(n) {
+  document.querySelectorAll('.nz-stepper__step').forEach((li) => {
+    const i = Number(li.dataset.paso);
+    li.classList.toggle('is-active', i === n);
+    li.classList.toggle('is-done', i < n);
+  });
+}
+function mostrar(id, si = true) { $(id).classList.toggle('mm-oculto', !si); }
+function error(titulo, texto) {
+  $('errorTitulo').textContent = titulo;
+  $('errorTexto').textContent = texto;
+  mostrar('alertaError', true);
+  mostrar('panelProgreso', false);
+}
+function limpiarError() { mostrar('alertaError', false); }
 
-        const t = Date.now() * 0.001;
+// ── Colores del PDF en el navegador (median cut) ─────────────────────────────
+if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
-        // Particles drift
-        const pos = particleGeo.attributes.position.array;
-        for (let i = 0; i < particleCount; i++) {
-          pos[i * 3 + 1] += Math.sin(t * 0.3 + i * 0.01) * 0.003;
-          pos[i * 3] += Math.cos(t * 0.2 + i * 0.01) * 0.002;
-        }
-        particleGeo.attributes.position.needsUpdate = true;
+const aHex = (r, g, b) => '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
 
-        // Shapes rotation + float
-        shapes.forEach(s => {
-          s.rotation.x += s.userData.rotSpeed.x;
-          s.rotation.y += s.userData.rotSpeed.y;
-          s.rotation.z += s.userData.rotSpeed.z;
-          s.position.y += Math.sin(t * s.userData.floatSpeed + s.userData.floatOffset) * 0.005;
-        });
+function medianCut(pixeles, n) {
+  if (!pixeles.length) return [];
+  const rango = (b) => {
+    let min = [255, 255, 255];
+    let max = [0, 0, 0];
+    for (const p of b) for (let i = 0; i < 3; i++) { if (p[i] < min[i]) min[i] = p[i]; if (p[i] > max[i]) max[i] = p[i]; }
+    return [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+  };
+  let cubos = [pixeles];
+  while (cubos.length < n) {
+    let idx = 0; let mayor = 0;
+    cubos.forEach((c, i) => { if (c.length > mayor) { mayor = c.length; idx = i; } });
+    const cubo = cubos[idx];
+    if (cubo.length < 2) break;
+    const r = rango(cubo);
+    const canal = r[1] >= r[0] && r[1] >= r[2] ? 1 : (r[2] >= r[0] && r[2] >= r[1] ? 2 : 0);
+    cubo.sort((a, b) => a[canal] - b[canal]);
+    const medio = Math.floor(cubo.length / 2);
+    cubos.splice(idx, 1, cubo.slice(0, medio), cubo.slice(medio));
+  }
+  return cubos.map((c) => {
+    const suma = c.reduce((a, p) => [a[0] + p[0], a[1] + p[1], a[2] + p[2]], [0, 0, 0]);
+    return suma.map((v) => v / c.length);
+  });
+}
 
-        // Camera follows mouse subtly
-        camera.position.x += (mouseX * 2 - camera.position.x) * 0.02;
-        camera.position.y += (-mouseY * 2 - camera.position.y) * 0.02;
-        camera.lookAt(scene.position);
-
-        renderer.render(scene, camera);
-      }
-      animate();
-
-      window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-    })();
-
-    // ═══════════════════════════════════════════════════════════
-    // PDF.JS — Client-side rendering + color extraction
-    // ═══════════════════════════════════════════════════════════
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-
-    // Median Cut Algorithm for color quantization
-    function medianCut(pixels, numColors) {
-      if (pixels.length === 0) return [];
-
-      function getRange(bucket) {
-        let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
-        for (const p of bucket) {
-          if (p[0] < minR) minR = p[0]; if (p[0] > maxR) maxR = p[0];
-          if (p[1] < minG) minG = p[1]; if (p[1] > maxG) maxG = p[1];
-          if (p[2] < minB) minB = p[2]; if (p[2] > maxB) maxB = p[2];
-        }
-        return { r: maxR - minR, g: maxG - minG, b: maxB - minB };
-      }
-
-      let buckets = [pixels.slice()];
-
-      while (buckets.length < numColors) {
-        let maxIdx = 0, maxLen = 0;
-        for (let i = 0; i < buckets.length; i++) {
-          if (buckets[i].length > maxLen) { maxLen = buckets[i].length; maxIdx = i; }
-        }
-        if (buckets[maxIdx].length < 2) break;
-
-        const bucket = buckets[maxIdx];
-        const range = getRange(bucket);
-
-        let channel = 0;
-        if (range.g >= range.r && range.g >= range.b) channel = 1;
-        else if (range.b >= range.r && range.b >= range.g) channel = 2;
-
-        bucket.sort((a, b) => a[channel] - b[channel]);
-        const mid = Math.floor(bucket.length / 2);
-
-        buckets.splice(maxIdx, 1, bucket.slice(0, mid), bucket.slice(mid));
-      }
-
-      return buckets.map(bucket => {
-        let r = 0, g = 0, b = 0;
-        for (const p of bucket) { r += p[0]; g += p[1]; b += p[2]; }
-        const n = bucket.length;
-        return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
-      });
+async function extraerColores(file) {
+  if (!window.pdfjsLib) return [];
+  const datos = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: datos }).promise;
+  const paginas = Math.min(pdf.numPages, 4);
+  const pixeles = [];
+  for (let n = 1; n <= paginas; n++) {
+    const pagina = await pdf.getPage(n);
+    const viewport = pagina.getViewport({ scale: 0.6 });
+    const lienzo = document.createElement('canvas');
+    lienzo.width = Math.round(viewport.width);
+    lienzo.height = Math.round(viewport.height);
+    const ctx = lienzo.getContext('2d');
+    await pagina.render({ canvasContext: ctx, viewport }).promise;
+    const d = ctx.getImageData(0, 0, lienzo.width, lienzo.height).data;
+    for (let i = 0; i < d.length; i += 16) {
+      if (d[i + 3] < 128) continue;
+      pixeles.push([d[i], d[i + 1], d[i + 2]]);
     }
+  }
+  const crudos = medianCut(pixeles, 18).map(([r, g, b]) => {
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    return { hex: aHex(r, g, b), saturacion: max === 0 ? 0 : (max - min) / max };
+  });
+  crudos.sort((a, b) => b.saturacion - a.saturacion);
+  const vistos = new Set();
+  const limpios = [];
+  for (const c of crudos) { if (vistos.has(c.hex)) continue; vistos.add(c.hex); limpios.push(c.hex); }
+  return limpios.slice(0, 10);
+}
 
-    function rgbToHex(r, g, b) {
-      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
-    }
-
-    // Distance between two colors in RGB space (0-441)
-    function colorDistance(c1, c2) {
-      return Math.sqrt(
-        Math.pow(c1[0] - c2[0], 2) +
-        Math.pow(c1[1] - c2[1], 2) +
-        Math.pow(c1[2] - c2[2], 2)
-      );
-    }
-
-    // Deduplicate similar colors (threshold ~30 = perceptually close)
-    function deduplicateColors(colors, threshold = 30) {
-      const unique = [];
-      for (const c of colors) {
-        const isDuplicate = unique.some(u => colorDistance([c.r, c.g, c.b], [u.r, u.g, u.b]) < threshold);
-        if (!isDuplicate) unique.push(c);
-      }
-      return unique;
-    }
-
-    async function extractColorsFromPDF(file) {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const totalPages = Math.min(pdf.numPages, 5); // Max 5 pages
-
-      const canvas = document.getElementById('pdfCanvas');
-      const ctx = canvas.getContext('2d');
-      const allPixels = [];
-
-      // Render multiple pages for better color coverage
-      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const scale = 1;
-        const viewport = page.getViewport({ scale });
-
-        // Use offscreen canvas for pages > 1
-        if (pageNum === 1) {
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-        }
-
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = viewport.width;
-        tempCanvas.height = viewport.height;
-        const tempCtx = tempCanvas.getContext('2d');
-
-        await page.render({ canvasContext: tempCtx, viewport }).promise;
-
-        // Extract pixels
-        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-        const data = imageData.data;
-
-        for (let i = 0; i < data.length; i += 8) { // Sample every 2nd pixel
-          const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-          if (a < 128) continue;
-          allPixels.push([r, g, b]);
-        }
-
-        // Render first page to visible canvas for preview
-        if (pageNum === 1) {
-          await page.render({ canvasContext: ctx, viewport }).promise;
-        }
-      }
-
-      // Show preview
-      document.getElementById('pdfPreview').classList.add('visible');
-
-      // Get dominant colors from ALL pages combined
-      const rawColors = medianCut(allPixels, 20);
-
-      rawColors.sort((a, b) => {
-        const satA = (Math.max(...a) - Math.min(...a)) / Math.max(...a);
-        const satB = (Math.max(...b) - Math.min(...b)) / Math.max(...b);
-        return satB - satA;
-      });
-
-      // Convert to objects
-      let colors = rawColors.map(c => ({
-        r: c[0], g: c[1], b: c[2],
-        hex: rgbToHex(c[0], c[1], c[2])
-      }));
-
-      // Deduplicate similar colors
-      colors = deduplicateColors(colors, 30);
-
-      return colors;
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // UI LOGIC
-    // ═══════════════════════════════════════════════════════════
-    const uploadZone = document.getElementById('uploadZone');
-    const fileInput = document.getElementById('fileInput');
-    const uploadPlaceholder = document.getElementById('uploadPlaceholder');
-    const fileInfo = document.getElementById('fileInfo');
-    const fileName = document.getElementById('fileName');
-    const fileSize = document.getElementById('fileSize');
-    const fileRemove = document.getElementById('fileRemove');
-    const colorsSection = document.getElementById('colorsSection');
-    const colorsRow = document.getElementById('colorsRow');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const progressSection = document.getElementById('progressSection');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    const resultSection = document.getElementById('resultSection');
-    const designGrid = document.getElementById('designGrid');
-    const designColors = document.getElementById('designColors');
-    const generateBtn = document.getElementById('generateBtn');
-    const htmlResult = document.getElementById('htmlResult');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const previewBtn = document.getElementById('previewBtn');
-    const newAnalysisBtn = document.getElementById('newAnalysisBtn');
-
-    let currentFile = null;
-    let detectedColors = [];
-    let currentDesign = null;
-    let generatedHTML = null;
-
-    function formatSize(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / 1048576).toFixed(1) + ' MB';
-    }
-
-    function renderColorChips() {
-      colorsRow.innerHTML = '';
-      detectedColors.forEach((c, idx) => {
-        const chip = document.createElement('div');
-        chip.className = 'color-chip';
-        chip.innerHTML = `
-          <input type="color" class="color-dot" value="${c.hex}" data-idx="${idx}" title="Cambiar color">
-          <input type="text" class="color-input" value="${c.hex}" data-idx="${idx}" maxlength="7">
-          <button class="color-remove" data-idx="${idx}" title="Eliminar">✕</button>
-        `;
-        colorsRow.appendChild(chip);
-      });
-
-      // Add color button
-      const addBtn = document.createElement('button');
-      addBtn.className = 'color-add';
-      addBtn.textContent = '+ Añadir';
-      addBtn.addEventListener('click', () => {
-        detectedColors.push({ r: 128, g: 128, b: 128, hex: '#808080' });
-        renderColorChips();
-      });
-      colorsRow.appendChild(addBtn);
-
-      // Bind events
-      colorsRow.querySelectorAll('.color-dot').forEach(input => {
-        input.addEventListener('input', (e) => {
-          const idx = parseInt(e.target.dataset.idx);
-          const hex = e.target.value;
-          detectedColors[idx].hex = hex;
-          // Update text input
-          const textInput = colorsRow.querySelector(`.color-input[data-idx="${idx}"]`);
-          if (textInput) textInput.value = hex;
-        });
-      });
-
-      colorsRow.querySelectorAll('.color-input').forEach(input => {
-        input.addEventListener('change', (e) => {
-          const idx = parseInt(e.target.dataset.idx);
-          let hex = e.target.value.trim();
-          if (!hex.startsWith('#')) hex = '#' + hex;
-          if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
-            detectedColors[idx].hex = hex;
-            const colorInput = colorsRow.querySelector(`.color-dot[data-idx="${idx}"]`);
-            if (colorInput) colorInput.value = hex;
-          }
-        });
-      });
-
-      colorsRow.querySelectorAll('.color-remove').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const idx = parseInt(e.target.dataset.idx);
-          detectedColors.splice(idx, 1);
-          renderColorChips();
-        });
-      });
-    }
-
-    function showColors(colors) {
-      detectedColors = colors;
-      renderColorChips();
-      colorsSection.classList.add('visible');
-    }
-
-    function showDesignInfo(design) {
-      designGrid.innerHTML = '';
-
-      // Editable fields with appropriate input types
-      const fields = [
-        { key: 'empresa', label: 'Empresa', type: 'text' },
-        { key: 'sector', label: 'Sector', type: 'text' },
-        { key: 'tono', label: 'Tono', type: 'select', options: ['formal','informal','creativo','corporativo','minimalista','audaz'] },
-        { key: 'inspiracion', label: 'Inspiración', type: 'text' },
-        { key: 'tipografia_heading', label: 'Tipografía Heading', type: 'select', options: ['serif','sans-serif','display','monospace'] },
-        { key: 'estilo', label: 'Estilo', type: 'textarea' },
-      ];
-
-      fields.forEach(f => {
-        let value = '';
-        if (f.key === 'tipografia_heading') {
-          value = design.tipografia?.heading || 'sans-serif';
-        } else {
-          value = design[f.key] || '';
-        }
-
-        const div = document.createElement('div');
-        div.className = 'design-item';
-
-        let inputHTML = '';
-        if (f.type === 'select') {
-          const options = f.options.map(o =>
-            `<option value="${o}" ${o === value ? 'selected' : ''}>${o}</option>`
-          ).join('');
-          inputHTML = `<select class="design-select" data-field="${f.key}">${options}</select>`;
-        } else if (f.type === 'textarea') {
-          inputHTML = `<textarea class="design-textarea" data-field="${f.key}">${value}</textarea>`;
-        } else {
-          inputHTML = `<input type="text" class="design-input" data-field="${f.key}" value="${value}">`;
-        }
-
-        div.innerHTML = `<div class="design-item-label">${f.label}</div>${inputHTML}`;
-        designGrid.appendChild(div);
-      });
-
-      // Editable palette colors
-      designColors.innerHTML = '';
-      if (design.paleta) {
-        const paleta = design.paleta;
-        ['primario', 'secundario', 'acento', 'fondo', 'texto'].forEach(key => {
-          const hex = paleta[key] || '#000000';
-          const item = document.createElement('div');
-          item.className = 'design-color-item';
-          item.innerHTML = `
-            <input type="color" value="${hex}" data-palette="${key}">
-            <input type="text" value="${hex}" data-palette="${key}" maxlength="7">
-            <span class="design-color-label">${key}</span>
-          `;
-          designColors.appendChild(item);
-        });
-
-        // Bind color sync events
-        designColors.querySelectorAll('input[type="color"]').forEach(input => {
-          input.addEventListener('input', (e) => {
-            const key = e.target.dataset.palette;
-            const hex = e.target.value;
-            const textInput = designColors.querySelector(`input[type="text"][data-palette="${key}"]`);
-            if (textInput) textInput.value = hex;
-            // Update the design object
-            if (currentDesign && currentDesign.paleta) currentDesign.paleta[key] = hex;
-          });
-        });
-
-        designColors.querySelectorAll('input[type="text"]').forEach(input => {
-          input.addEventListener('change', (e) => {
-            const key = e.target.dataset.palette;
-            let hex = e.target.value.trim();
-            if (!hex.startsWith('#')) hex = '#' + hex;
-            if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
-              const colorInput = designColors.querySelector(`input[type="color"][data-palette="${key}"]`);
-              if (colorInput) colorInput.value = hex;
-              if (currentDesign && currentDesign.paleta) currentDesign.paleta[key] = hex;
-            }
-          });
-        });
-      }
-
-      // Bind text field change events
-      designGrid.querySelectorAll('.design-input, .design-textarea, .design-select').forEach(input => {
-        input.addEventListener('change', (e) => {
-          const field = e.target.dataset.field;
-          const value = e.target.value;
-          if (!currentDesign) return;
-          if (field === 'tipografia_heading') {
-            if (!currentDesign.tipografia) currentDesign.tipografia = {};
-            currentDesign.tipografia.heading = value;
-          } else {
-            currentDesign[field] = value;
-          }
-        });
-      });
-
-      resultSection.classList.add('visible');
-    }
-
-    function setProgress(pct, text) {
-      progressBar.style.width = pct + '%';
-      progressText.textContent = text;
-    }
-
-    // Upload zone events
-    uploadZone.addEventListener('click', () => fileInput.click());
-    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
-    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
-    uploadZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadZone.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file && file.type === 'application/pdf') handleFile(file);
+// ── Paletas ──────────────────────────────────────────────────────────────────
+function pintarPaletas() {
+  const cont = $('listaPaletas');
+  cont.innerHTML = '';
+  estado.paletas.forEach((p, i) => {
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'nz-article nz-article--interactive mm-paleta';
+    boton.setAttribute('aria-pressed', String(i === 0));
+    const ratio = p.contraste ? p.contraste['blanco sobre marca-600'] : '';
+    boton.innerHTML = `
+      <div class="mm-muestra">
+        <span style="background:${p.marca}"></span>
+        <span style="background:${p.acento}"></span>
+      </div>
+      <div class="nz-stack nz-stack--2xs" style="margin-top:var(--nz-space-2)">
+        <span class="nz-lbl">${i === 0 ? 'Recomendada' : 'Alternativa'}</span>
+        <strong>${p.marca} · ${p.acento}</strong>
+        <span class="nz-text--small nz-text--muted">${p.descripcion || ''}</span>
+        ${ratio ? `<span class="nz-text--small nz-text--muted">Contraste ${ratio}:1 sobre blanco</span>` : ''}
+      </div>`;
+    boton.addEventListener('click', () => {
+      cont.querySelectorAll('.mm-paleta').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      boton.setAttribute('aria-pressed', 'true');
+      estado.elegida = p;
+      estado.marca = { nombre: p.nombre, color: p.marca, acento: p.acento };
+      $('colorMarca').value = p.marca;
+      $('colorAcento').value = p.acento;
+      $('paletaOrigen').textContent = 'Elegida';
     });
+    cont.appendChild(boton);
+  });
+  const p0 = estado.paletas[0];
+  if (p0) {
+    estado.elegida = p0;
+    estado.marca = { nombre: p0.nombre, color: p0.marca, acento: p0.acento };
+    $('colorMarca').value = p0.marca;
+    $('colorAcento').value = p0.acento;
+  }
+}
 
-    fileInput.addEventListener('change', () => {
-      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+// ── Formatos ─────────────────────────────────────────────────────────────────
+const ICONOS_FORMATO = {
+  catalogo: '<path d="M3 5h18v4H3zM3 11h8v8H3zM13 11h8v8h-8z"/>',
+  clasica: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+  producto: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7l8.7 5l8.7-5M12 22V12"/>',
+  evento: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  editorial: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+};
+
+function pintarFormatos() {
+  const cont = $('listaFormatos');
+  cont.innerHTML = '';
+  estado.plantillas.forEach((p) => {
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'nz-article nz-article--interactive mm-ejemplo';
+    boton.setAttribute('aria-pressed', String(p.id === estado.formato));
+    boton.innerHTML = `
+      <span class="nz-icon-tile">
+        <svg class="nz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONOS_FORMATO[p.id] || ICONOS_FORMATO.clasica}</svg>
+      </span>
+      <h3 class="nz-h6" style="margin-top:var(--nz-space-2)">${p.nombre}</h3>
+      <p class="nz-text--small nz-text--muted">${p.descripcion}</p>`;
+    boton.addEventListener('click', () => {
+      cont.querySelectorAll('.mm-ejemplo').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      boton.setAttribute('aria-pressed', 'true');
+      estado.formato = p.id;
     });
+    cont.appendChild(boton);
+  });
+}
 
-    fileRemove.addEventListener('click', (e) => {
-      e.stopPropagation();
-      resetAll();
+// ── Motores, estilos y temas ─────────────────────────────────────────────────
+async function cargarMotores() {
+  try {
+    const d = await (await fetch('/api/motores')).json();
+    if (!d.ok) return;
+    estado.motores = d;
+    const cont = $('listaEstilos');
+    cont.innerHTML = '';
+    d.estilos.forEach((e) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'nz-article nz-article--interactive mm-ejemplo';
+      b.setAttribute('aria-pressed', String(e.id === estado.estilo));
+      b.innerHTML = `<strong>${e.nombre}</strong><p class="nz-text--small nz-text--muted">${e.descripcion}</p>`;
+      b.addEventListener('click', () => {
+        cont.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', 'false'));
+        b.setAttribute('aria-pressed', 'true');
+        estado.estilo = e.id;
+      });
+      cont.appendChild(b);
     });
-
-    function resetAll() {
-      currentFile = null;
-      detectedColors = [];
-      currentDesign = null;
-      generatedHTML = null;
-      fileInput.value = '';
-      uploadPlaceholder.style.display = '';
-      fileInfo.classList.remove('visible');
-      colorsSection.classList.remove('visible');
-      document.getElementById('pdfPreview').classList.remove('visible');
-      resultSection.classList.remove('visible');
-      htmlResult.classList.remove('visible');
-      progressSection.classList.remove('visible');
-      analyzeBtn.disabled = true;
-      analyzeBtn.innerHTML = '🔍 Analizar diseño con IA';
+    $('motorResumen').textContent = d.componentes ? d.componentes + ' componentes' : '36 componentes';
+    if (!d.openuiListo) {
+      $('modoAyuda').textContent = 'El motor libre no está disponible ahora mismo: se usará la composición fija.';
     }
+  } catch { /* sin motores, se queda el modo de bloques */ }
+}
 
-    async function handleFile(file) {
-      currentFile = file;
-      uploadPlaceholder.style.display = 'none';
-      fileInfo.classList.add('visible');
-      fileName.textContent = file.name;
-      fileSize.textContent = formatSize(file.size);
+document.querySelectorAll('#selectorModo button').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#selectorModo button').forEach((x) => x.setAttribute('aria-selected', 'false'));
+    b.setAttribute('aria-selected', 'true');
+    estado.modo = b.dataset.modo;
+    $('motorResumen').textContent = b.dataset.modo === 'openui' ? '36 componentes' : '5 plantillas';
+    $('modoAyuda').textContent = b.dataset.modo === 'openui'
+      ? 'El modelo compone con 36 componentes del sistema: cada negocio sale con una estructura distinta.'
+      : 'Bloques del sistema en un orden probado. Más predecible y algo más rápido.';
+  });
+});
 
-      // Extract colors from PDF
-      analyzeBtn.disabled = true;
-      analyzeBtn.innerHTML = '<span class="spinner"></span> Analizando PDF...';
+document.querySelectorAll('#selectorTema button').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#selectorTema button').forEach((x) => x.setAttribute('aria-selected', 'false'));
+    b.setAttribute('aria-selected', 'true');
+    estado.tema = b.dataset.tema;
+  });
+});
 
-      try {
-        detectedColors = await extractColorsFromPDF(file);
-        showColors(detectedColors);
-        analyzeBtn.disabled = false;
-        analyzeBtn.innerHTML = '🔍 Analizar diseño con IA';
-      } catch (err) {
-        console.error('Error extracting colors:', err);
-        analyzeBtn.disabled = false;
-        analyzeBtn.innerHTML = '🔍 Analizar diseño con IA';
-      }
-    }
-
-    // Analyze button
-    analyzeBtn.addEventListener('click', async () => {
-      if (!currentFile) return;
-
-      analyzeBtn.disabled = true;
-      analyzeBtn.innerHTML = '<span class="spinner"></span> Analizando...';
-      progressSection.classList.add('visible');
-      resultSection.classList.remove('visible');
-      htmlResult.classList.remove('visible');
-
-      try {
-        // Step 1: Upload and analyze PDF
-        setProgress(20, 'Subiendo PDF al servidor...');
-        const formData = new FormData();
-        formData.append('pdf', currentFile);
-
-        // Include detected colors
-        const colorData = detectedColors.map(c => c.hex);
-
-        // Send detected colors to backend
-        formData.append('detectedColors', JSON.stringify(detectedColors.map(c => c.hex)));
-
-        setProgress(40, 'IA analizando el diseño...');
-        const analyzeRes = await fetch('/api/analyze', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!analyzeRes.ok) {
-          const err = await analyzeRes.json();
-          throw new Error(err.error || 'Error analizando el PDF');
-        }
-
-        const analyzeData = await analyzeRes.json();
-        currentDesign = analyzeData.design;
-
-        // Merge detected colors into the design
-        if (colorData.length > 0) {
-          currentDesign._detectedColors = colorData;
-        }
-
-        setProgress(100, 'Análisis completado');
-        showDesignInfo(currentDesign);
-
-      } catch (err) {
-        alert('Error: ' + err.message);
-        progressSection.classList.remove('visible');
-        analyzeBtn.disabled = false;
-        analyzeBtn.innerHTML = '🔍 Analizar diseño con IA';
-      }
-    });
-
-    // Generate button
-    generateBtn.addEventListener('click', async () => {
-      if (!currentDesign) return;
-
-      generateBtn.disabled = true;
-      generateBtn.innerHTML = '<span class="spinner"></span> Generando landing...';
-      progressSection.classList.add('visible');
-      htmlResult.classList.remove('visible');
-
-      try {
-        setProgress(30, 'Generando HTML con IA...');
-
-        const res = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ design: currentDesign }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Error generando la landing');
-        }
-
-        const data = await res.json();
-        generatedHTML = data.html;
-
-        setProgress(100, 'Landing page generada');
-        htmlResult.classList.add('visible');
-
-      } catch (err) {
-        alert('Error: ' + err.message);
-        progressSection.classList.remove('visible');
-      } finally {
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = '🚀 Generar Landing Page';
-      }
-    });
-
-    // Download
-    downloadBtn.addEventListener('click', () => {
-      if (!generatedHTML) return;
-      const blob = new Blob([generatedHTML], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
+// ── Ejemplos ─────────────────────────────────────────────────────────────────
+async function cargarEjemplos() {
+  const cont = $('listaEjemplos');
+  try {
+    const d = await (await fetch('/api/ejemplos')).json();
+    if (!d.ok) throw new Error(d.error || 'sin datos');
+    estado.plantillas = d.plantillas;
+    pintarFormatos();
+    cont.innerHTML = '';
+    d.ejemplos.forEach((e) => {
       const a = document.createElement('a');
-      a.href = url;
-      a.download = 'landing-page.html';
-      a.click();
-      URL.revokeObjectURL(url);
+      a.className = 'nz-article nz-article--interactive mm-enlace';
+      a.href = e.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.innerHTML = `
+        <div class="nz-cluster nz-cluster--between">
+          <span class="nz-lbl">${e.formato}</span>
+          <span class="nz-lbl nz-lbl--brand">${e.nombrePlantilla}</span>
+        </div>
+        <h3 class="nz-h5" style="margin-top:var(--nz-space-2)">${e.empresa}</h3>
+        <p class="nz-text--small nz-text--muted">${e.resumen}</p>
+        <div class="mm-muestra" style="height:1.25rem;margin-top:var(--nz-space-3)">
+          <span style="background:${e.marca.color}"></span>
+          <span style="background:${e.marca.acento}"></span>
+        </div>
+        <span class="nz-cta" style="margin-top:var(--nz-space-2)">Ver el ejemplo<span class="nz-cta__arrow">→</span></span>`;
+      cont.appendChild(a);
     });
+    const aur = await (await fetch('/api/aurora')).json();
+    if (aur.ok) $('pieVersion').textContent = 'v' + aur.version;
+  } catch (err) {
+    cont.innerHTML = `<div class="nz-alert nz-alert--warning"><div class="nz-alert__body"><span class="nz-alert__title">No se pudieron cargar los ejemplos</span><span class="nz-alert__msg">${err.message}</span></div></div>`;
+  }
+}
 
-    // Preview
-    previewBtn.addEventListener('click', () => {
-      if (!generatedHTML) return;
-      const blob = new Blob([generatedHTML], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
+// ── Fichero ──────────────────────────────────────────────────────────────────
+function ficheroElegido(file) {
+  if (!file) return;
+  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+    return error('Ese archivo no es un PDF', 'Necesito el PDF de la propuesta. Si lo tienes en Word o PowerPoint, expórtalo a PDF primero.');
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    return error('El PDF es demasiado grande', 'El límite son 20 MB. Comprime las imágenes del documento o exporta una versión más ligera.');
+  }
+  limpiarError();
+  estado.fichero = file;
+  $('zonaTexto').innerHTML = `<strong>${file.name}</strong><span class="nz-text--small nz-text--muted">${(file.size / 1048576).toFixed(1)} MB · listo para generar</span>`;
+  $('avisoFichero').textContent = file.name + ' · listo';
+  $('btnGenerar').disabled = false;
+  // el protagonismo cambia: ya hay archivo, el siguiente paso es generar
+  $('btnGenerar').className = 'nz-btn nz-btn--primary nz-btn--lg nz-btn--block';
+  $('btnElegir').className = 'nz-btn nz-btn--ghost nz-btn--block';
+  $('btnElegir').textContent = 'Cambiar PDF';
+  marcarPaso(2);
+}
+
+// ── Generación ───────────────────────────────────────────────────────────────
+let reloj = null;
+function arrancarProgreso() {
+  mostrar('panelProgreso', true);
+  const inicio = Date.now();
+  const pasos = [
+    [8, 'Extrayendo el texto del PDF…', 'Leyendo el documento.'],
+    [26, 'Detectando los colores reales…', 'Renderizando las páginas y agrupando los píxeles.'],
+    [46, 'La IA lee la propuesta…', 'Nombre, sector, público y tono.'],
+    [70, 'Escribiendo los textos…', 'Titulares, ventajas, precios y preguntas.'],
+    [88, 'Montando la página con Aurora…', 'Composición con objetos reales del sistema.'],
+  ];
+  let i = 0;
+  $('progresoBarra').style.width = '8%';
+  reloj = setInterval(() => {
+    const s = Math.round((Date.now() - inicio) / 1000);
+    $('progresoTiempo').textContent = s + ' s';
+    if (s > i * 4 && i < pasos.length - 1) i++;
+    const p = pasos[i];
+    $('progresoBarra').style.width = p[0] + '%';
+    $('progresoTitulo').textContent = p[1];
+    $('progresoDetalle').textContent = p[2];
+  }, 900);
+}
+function pararProgreso() {
+  if (reloj) clearInterval(reloj);
+  reloj = null;
+  $('progresoBarra').style.width = '100%';
+  setTimeout(() => mostrar('panelProgreso', false), 400);
+}
+
+async function generar() {
+  if (!estado.fichero) return;
+  limpiarError();
+  $('btnGenerar').disabled = true;
+  $('btnGenerar').textContent = 'Trabajando…';
+  marcarPaso(2);
+  arrancarProgreso();
+
+  try {
+    let colores = [];
+    try { colores = await extraerColores(estado.fichero); } catch { colores = []; }
+    estado.colores = colores;
+
+    const datos = new FormData();
+    datos.append('pdf', estado.fichero);
+    datos.append('colores', JSON.stringify(colores));
+    datos.append('plantilla', estado.formato);
+    datos.append('modo', estado.modo);
+    datos.append('estilo', estado.estilo);
+    datos.append('tema', estado.tema);
+
+    const r = await fetch('/api/generar', { method: 'POST', body: datos });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'La generación no llegó a término.');
+
+    pararProgreso();
+    estado.resultado = d;
+    if (d.design?.plantilla && estado.plantillas.some((p) => p.id === d.design.plantilla)) {
+      estado.formato = d.design.plantilla;
+    }
+    mostrarResultado(d);
+    if (d.degradado) {
+      error('Se ha usado una vista de ejemplo', d.motivo || 'La IA no respondió. Reintenta en unos segundos.');
+    }
+    marcarPaso(3);
+  } catch (err) {
+    pararProgreso();
+    error('No se pudo generar la landing', err.message + ' Puedes reintentarlo; si sigue fallando, prueba con otro PDF.');
+  } finally {
+    $('btnGenerar').disabled = false;
+    $('btnGenerar').textContent = 'Generar la landing';
+  }
+}
+
+function mostrarResultado(d) {
+  mostrar('pasoResultado', true);
+  estado.varianteActiva = 0;
+  const sel = $('selectorVariantes');
+
+  // ── Modo Libre (OpenUI): una sola página, compuesta por el modelo ──────────
+  if (d.modo === 'openui' && d.url) {
+    $('resultadoTitulo').textContent = (d.design?.empresa ? d.design.empresa + ' · ' : '') + (d.estiloNombre || 'Libre');
+    const nComp = Object.keys(d.componentes || {}).length;
+    $('resultadoDetalle').textContent = `${d.nodos || 0} piezas · ${nComp} componentes · ${d.temaNombre || ''} · motor libre`
+      + (d.intentos > 1 ? ` · corregido en ${d.intentos} intentos` : '');
+    sel.innerHTML = `<span class="nz-badge nz-badge--success">Compuesta por el modelo</span>`
+      + (d.ajustesColor?.length ? ` <span class="nz-badge nz-badge--neutral">${d.ajustesColor.length} ajuste(s) de color</span>` : '');
+    estado.marca = { nombre: d.marca?.nombre || 'aurora', color: d.marca?.marca || '#2563eb', acento: d.marca?.acento || '#f97316' };
+    cargarVista(d.url);
+    $('pasoResultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+
+  // ── Modo Composición fija: tres paletas ───────────────────────────────────
+  const primera = (d.vistas || [])[0];
+  if (!primera) return;
+  $('resultadoTitulo').textContent = (d.design?.empresa ? d.design.empresa + ' · ' : '') + (d.nombrePlantilla || 'Landing');
+  $('resultadoDetalle').textContent = primera.bloques?.length
+    ? `${primera.bloques.length} bloques · ${primera.packs.length} packs de Aurora · contraste ${primera.contraste['blanco sobre marca-600']}:1`
+    : '';
+
+  sel.innerHTML = '';
+  d.vistas.forEach((v, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'nz-chip';
+    b.textContent = v.esRecomendada ? 'Paleta recomendada' : 'Paleta ' + (i + 1);
+    b.setAttribute('aria-pressed', String(i === 0));
+    if (i === 0) b.classList.add('nz-chip--brand');
+    b.addEventListener('click', () => {
+      sel.querySelectorAll('button').forEach((x) => { x.classList.remove('nz-chip--brand'); x.setAttribute('aria-pressed', 'false'); });
+      b.classList.add('nz-chip--brand');
+      b.setAttribute('aria-pressed', 'true');
+      estado.varianteActiva = i;
+      estado.marca = { nombre: v.id, color: v.marca.marca, acento: v.marca.acento };
+      cargarVista(v.url);
     });
+    sel.appendChild(b);
+  });
+  cargarVista(primera.url);
+  $('pasoResultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
-    // New analysis
-    newAnalysisBtn.addEventListener('click', resetAll);
-  </script>
+async function cargarVista(url) {
+  // la URL es la de la página real servida (/vista/<id>.html)
+  $('vistaPrevia').src = url;
+  $('btnAbrir').href = url;
+  try { estado.html = await (await fetch(url)).text(); } catch { estado.html = ''; }
+}
+
+// ── Descarga: la marca viaja dentro del fichero ──────────────────────────────
+async function descargar() {
+  if (!estado.html) return;
+  const m = estado.marca;
+  try {
+    const css = await (await fetch(`/marca/${m.nombre}.css?c=${encodeURIComponent(m.color)}&a=${encodeURIComponent(m.acento)}`)).text();
+    const html = estado.html.replace(/<link rel="stylesheet" href="\/marca\/[^"]*">/, `<style>\n${css}\n</style>`);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const nombre = (estado.resultado?.design?.empresa || 'landing').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
+    a.download = `${nombre}-aurora.html`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch (err) {
+    error('No se pudo preparar la descarga', err.message);
+  }
+}
+
+// ── Eventos ──────────────────────────────────────────────────────────────────
+$('fileInput').addEventListener('change', (e) => ficheroElegido(e.target.files[0]));
+$('btnElegir').addEventListener('click', () => $('fileInput').click());
+$('btnGenerar').addEventListener('click', generar);
+$('btnDescargar').addEventListener('click', descargar);
+$('btnReintentar').addEventListener('click', () => { limpiarError(); if (estado.fichero) generar(); });
+$('btnOtro').addEventListener('click', () => {
+  estado.fichero = null; estado.html = ''; estado.resultado = null;
+  $('fileInput').value = '';
+  $('zonaTexto').innerHTML = '<strong>Arrastra aquí el PDF de tu propuesta</strong><span class="nz-text--small nz-text--muted">o haz clic para buscarlo · máximo 20 MB</span>';
+  $('avisoFichero').textContent = 'Sin archivo todavía';
+  $('btnGenerar').disabled = true;
+  $('btnGenerar').className = 'nz-btn nz-btn--outline nz-btn--block';
+  $('btnElegir').className = 'nz-btn nz-btn--primary nz-btn--lg nz-btn--block';
+  $('btnElegir').textContent = 'Elegir PDF';
+  mostrar('pasoResultado', false);
+  mostrar('pasoAjustes', false);
+  marcarPaso(1);
+  $('subir').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+document.querySelectorAll('#selectorVista button').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#selectorVista button').forEach((x) => x.setAttribute('aria-selected', 'false'));
+    b.setAttribute('aria-selected', 'true');
+    $('marco').style.width = b.dataset.ancho === 'movil' ? '390px' : b.dataset.ancho === 'tablet' ? '768px' : '100%';
+  });
+});
+
+$('colorMarca').addEventListener('input', (e) => {
+  estado.marca.color = e.target.value;
+  estado.marca.nombre = 'personalizada';
+  $('paletaOrigen').textContent = 'Personalizada';
+});
+$('colorAcento').addEventListener('input', (e) => {
+  estado.marca.acento = e.target.value;
+  estado.marca.nombre = 'personalizada';
+  $('paletaOrigen').textContent = 'Personalizada';
+});
+
+['dragenter', 'dragover'].forEach((ev) => document.addEventListener(ev, (e) => {
+  e.preventDefault();
+  $('filezona').classList.add('is-success');
+}));
+['dragleave', 'drop'].forEach((ev) => document.addEventListener(ev, (e) => {
+  e.preventDefault();
+  if (ev === 'drop') $('filezona').classList.remove('is-success');
+}));
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer?.files?.[0];
+  if (f) ficheroElegido(f);
+});
+
+cargarEjemplos();
+cargarMotores();
+marcarPaso(1);
+</script>
 </body>
 </html>

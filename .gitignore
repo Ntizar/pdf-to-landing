@@ -1,5 +1,7 @@
 node_modules/
 .env
+vistas/
 uploads/
-deploy/
+capturas/
 *.pdf
+scripts-*.mjs

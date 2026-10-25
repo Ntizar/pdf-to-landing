@@ -1,19 +1,36 @@
 {
   "name": "pdf-to-landing",
-  "version": "1.0.0",
+  "version": "8.0.0",
   "type": "module",
   "main": "server.js",
+  "description": "De un PDF a una landing page: la IA escribe el contenido, el sistema decide el diseño. Dos motores: libre (openui-lang) y composición fija, sobre el design system Aurora",
+  "author": "David Antizar",
+  "license": "MIT",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node arnes.mjs",
+    "test:lint": "node arnes.mjs lint",
+    "test:marcas": "node arnes.mjs marcas",
+    "test:descarga": "node arnes.mjs descarga",
+    "test:paletas": "node arnes.mjs paletas",
+    "test:servidor": "node arnes.mjs servidor",
+    "test:openui": "node arnes.mjs openui"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": [
+    "pdf",
+    "landing",
+    "aurora",
+    "design-system",
+    "ia",
+    "qwen"
+  ],
   "dependencies": {
-    "cors": "^2.8.6",
     "express": "^5.2.1",
     "multer": "^2.2.0",
-    "pdf-parse": "^1.1.4"
+    "pdf-parse": "1.1.4"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
